@@ -49,5 +49,21 @@ beta_t_dt <- data.table(beta=as.vector(beta_time),time=seq(0,11))
 ggplot(beta_t_dt, aes(x=time,y=beta)) + geom_line() + theme_bw()
 
 
+# Rt scenarios ------------------------------------------------------------
 
+logistic_curve <- function(rt_before, rt_after, num_days, midpoint_day, k) {
+  x <- seq(0,num_days)
+  return(rt_before + (rt_after - rt_before) / (1 + exp(-k*(x - midpoint_day))))
+}
+
+heaviside <- function(rt_before, rt_after, num_days, midpoint_day) {
+  x <- seq(0,num_days)
+  ifelse(x < midpoint_day, rt_before, rt_after)
+}
+
+ggplot(data.table(day=seq(0,100),rt=logistic_curve(1.3, 0.6, 100, 20, 0.5)),
+       aes(x = day, y = rt)) + geom_line() + geom_point() + theme_bw()
+
+ggplot(data.table(day=seq(0,100),rt=heaviside(1.3, 0.6, 100, 20)),
+       aes(x = day, y = rt)) + geom_point() + theme_bw()
 
