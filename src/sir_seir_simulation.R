@@ -6,58 +6,15 @@
 pacman::p_load(deSolve, plotly, data.table)
 
 
-sir_1 <- function(beta, gamma, S0, I0, R0, times) {
-  require(deSolve) # for the "ode" function
-  
-  # the differential equations:
-  sir_equations <- function(time, variables, parameters) {
-    with(as.list(c(variables, parameters)), {
-      dS <- -beta * I * S
-      dI <-  beta * I * S - gamma * I
-      dR <-  gamma * I
-      return(list(c(dS, dI, dR)))
-    })
-  }
-  
-  # the parameters values:
-  parameters_values <- c(beta  = beta, gamma = gamma)
-  
-  # the initial values of variables:
-  initial_values <- c(S = S0, I = I0, R = R0)
-  
-  # solving
-  out <- ode(initial_values, times, sir_equations, parameters_values)
-  
-  # returning the output:
-  melt(as.data.table(out),id.vars="time")
-}
-
-sir_dt <- sir_1(beta = 0.004, gamma = 0.5, S0 = 999, I0 = 1, R0 = 0, times = seq(0, 10))
-
-p <- ggplot(sir_dt, aes(x=time,y=value,color=variable)) +
-  geom_line() +
-  geom_point() +
-  theme_bw()
-
-ggplotly(p)
-
-
-beta_list <- c(0.7, 0.001, 0.08, 0.004)
-beta_time <- sapply(beta_list,function(beta) rep(beta,3))
-beta_t_dt <- data.table(beta=as.vector(beta_time),time=seq(0,11))
-
-ggplot(beta_t_dt, aes(x=time,y=beta)) + geom_line() + theme_bw()
-
-
 # Rt scenarios ------------------------------------------------------------
 
-logistic_curve <- function(rt_before, rt_after, num_days, midpoint_day, k) {
-  x <- seq(0,num_days)
+logistic_curve <- function(rt_before, rt_after, n_t, midpoint_day, k) {
+  x <- seq(0,n_t)
   return(rt_before + (rt_after - rt_before) / (1 + exp(-k*(x - midpoint_day))))
 }
 
-heaviside <- function(rt_before, rt_after, num_days, midpoint_day) {
-  x <- seq(0,num_days)
+heaviside <- function(rt_before, rt_after, n_t, midpoint_day) {
+  x <- seq(0,n_t)
   ifelse(x < midpoint_day, rt_before, rt_after)
 }
 
@@ -67,3 +24,86 @@ ggplot(data.table(day=seq(0,100),rt=logistic_curve(1.3, 0.6, 100, 20, 0.5)),
 ggplot(data.table(day=seq(0,100),rt=heaviside(1.3, 0.6, 100, 20)),
        aes(x = day, y = rt)) + geom_point() + theme_bw()
 
+construct_beta <- function(rt, t_I, n_t) {
+  beta_t_all <- rt / t_I
+  if(length(rt) == 1) {
+    function(t) beta_t_all
+  } else {
+    approxfun(0:n_t, beta_t_all)
+  }
+}
+
+simulate_seir_ode <- function(
+    rt, t_E, t_I,
+    N, S_init, E_init, I_init,
+    n_t,
+    n_steps_per_t = 1 # Ignored; included so the function signature matches stochastic version
+) {
+  library(deSolve)
+  
+  beta <- construct_beta(rt, t_I, n_t)
+  d_dt <- function(t, y, params) {
+    dS <- y['S'] * beta(t) * y['I'] / N
+    dIR <- y['I'] / t_I
+    
+    if(t_E > 0) {
+      # SEIR model
+      dEI <- y['E'] / t_E
+      list(c(
+        S = -dS,
+        E = dS - dEI,
+        I = dEI - dIR,
+        R = dIR,
+        cum_dS = dS,
+        cum_dEI = dEI
+      ), NULL)
+    }
+    else {
+      # SIR model
+      list(c(
+        S = -dS,
+        E = 0,
+        I = dS - dIR,
+        R = dIR,
+        cum_dS = dS,
+        cum_dEI = dS
+      ), NULL)
+    }
+  }
+  
+  y_init <- c(
+    S = S_init,
+    E = if(t_E > 0) E_init else 0,
+    I = if(t_E > 0) I_init else E_init + I_init,
+    R = 0,
+    cum_dS = 0,
+    cum_dEI = 0
+  )
+  #automatic ode solver is lsoda, an "automatic stiff/non-stiff solver"
+  as.data.table(ode(y_init, 0:n_t, d_dt, NULL)) %>%
+    mutate(dS = cum_dS - lag(cum_dS, 1)) %>%
+    mutate(dEI = cum_dEI - lag(cum_dEI, 1)) %>%
+    mutate(dIR = R - lag(R, 1))
+}
+
+t_E = 0
+t_I = 4
+n_t = 100
+N = 1000
+E_init = 0
+I_init = 50
+S_init = 950
+
+rt=logistic_curve(1.3, 0.6, n_t, 20, 0.5)
+
+
+seir_dt <- simulate_seir_ode(
+  rt, t_E, t_I,
+  N, S_init, E_init, I_init,
+  n_t,
+  n_steps_per_t = 1 # Ignored; included so the function signature matches stochastic version
+)
+
+long_seir_dt <- melt(seir_dt[,.(time,S,I,R)], id.vars = "time")
+
+ggplot(long_seir_dt, aes(x=time,y=value,color=variable)) + geom_line() + theme_bw()
