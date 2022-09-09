@@ -18,12 +18,6 @@ heaviside <- function(rt_before, rt_after, n_t, midpoint_day) {
   ifelse(x < midpoint_day, rt_before, rt_after)
 }
 
-ggplot(data.table(day=seq(0,100),rt=logistic_curve(1.3, 0.6, 100, 20, 0.5)),
-       aes(x = day, y = rt)) + geom_line() + geom_point() + theme_bw()
-
-ggplot(data.table(day=seq(0,100),rt=heaviside(1.3, 0.6, 100, 20)),
-       aes(x = day, y = rt)) + geom_point() + theme_bw()
-
 construct_beta <- function(rt, t_I, n_t) {
   beta_t_all <- rt / t_I
   if(length(rt) == 1) {
@@ -87,15 +81,15 @@ simulate_seir_ode <- function(
 }
 
 t_E = 0
-t_I = 4
+t_I = 4 # mean time infected
 n_t = 100
 N = 1000
 E_init = 0
 I_init = 50
 S_init = 950
 
-rt=logistic_curve(1.3, 0.6, n_t, 20, 0.5)
-
+rt <- logistic_curve(2.3, 0.6, n_t, 40, 0.5)
+rt <- heaviside(2.3, 0.6, n_t, 40)
 
 seir_dt <- simulate_seir_ode(
   rt, t_E, t_I,
@@ -106,4 +100,10 @@ seir_dt <- simulate_seir_ode(
 
 long_seir_dt <- melt(seir_dt[,.(time,S,I,R)], id.vars = "time")
 
-ggplot(long_seir_dt, aes(x=time,y=value,color=variable)) + geom_line() + theme_bw()
+ggplot(data.table(day=seq(0,100),rt=logistic_curve(2.3, 0.6, n_t, 40, 0.5)),
+       aes(x = day, y = rt)) + geom_line() + geom_point() + theme_bw()
+
+ggplot(data.table(day=seq(0,100),rt=heaviside(2.3, 0.6, 100, 40)),
+       aes(x = day, y = rt)) + geom_point() + theme_bw()
+
+g <- ggplot(long_seir_dt, aes(x=time,y=value,color=variable)) + geom_line() + theme_bw()
