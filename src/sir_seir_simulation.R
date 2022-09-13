@@ -1,6 +1,6 @@
 # Name: Han Yong Wunrow
 # Date: 2022/08/26
-# Description: Deterministic SIR and SEIR simulation code
+# Description: Deterministic and stochastic SIR and SEIR simulation code
 
 
 pacman::p_load(deSolve, plotly, data.table)
@@ -18,20 +18,45 @@ heaviside <- function(rt_before, rt_after, n_t, midpoint_day) {
   ifelse(x < midpoint_day, rt_before, rt_after)
 }
 
+# construct_beta <- function(rt, t_I, n_t) {
+#   beta_t_all <- rt / t_I
+#   if(length(rt) == 1) {
+#     function(t) beta_t_all
+#   } else {
+#     approxfun(0:n_t, beta_t_all)
+#   }
+# }
+
 construct_beta <- function(rt, t_I, n_t) {
   beta_t_all <- rt / t_I
-  if(length(rt) == 1) {
-    function(t) beta_t_all
-  } else {
-    approxfun(0:n_t, beta_t_all)
-  }
 }
 
-simulate_seir_ode <- function(
+simiulate_seir_ode_stoc <- function(
     rt, t_E, t_I,
     N, S_init, E_init, I_init,
-    n_t,
-    n_steps_per_t = 1 # Ignored; included so the function signature matches stochastic version
+    n_t
+) {
+  beta <- construct_beta(rt, t_I, n_t)
+  
+  for(t in 1:n_t) {
+    inf <- rpois(1, beta[t]*I[t]*S[t])
+    rec <- rpois(1, gamma*I[t])
+    
+    S_new <- min(max(S[t]-inf,0),N)
+    I_new <- min(max(I[t]+inf-rec,0),N)
+    R_new <- min(max(R[t]+rec,0),N)
+    
+    S <- c(S,S_new)
+    I <- c(I,I_new)
+    R <- c(R,R_new)
+  }
+
+}
+
+simulate_seir_ode_det <- function(
+    rt, t_E, t_I,
+    N, S_init, E_init, I_init,
+    n_t
 ) {
   library(deSolve)
   
@@ -91,7 +116,7 @@ S_init = 950
 rt <- logistic_curve(2.3, 0.6, n_t, 40, 0.5)
 rt <- heaviside(2.3, 0.6, n_t, 40)
 
-seir_dt <- simulate_seir_ode(
+seir_dt <- simulate_seir_ode_det(
   rt, t_E, t_I,
   N, S_init, E_init, I_init,
   n_t,
