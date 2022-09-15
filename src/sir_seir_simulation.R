@@ -18,39 +18,65 @@ heaviside <- function(rt_before, rt_after, n_t, midpoint_day) {
   ifelse(x < midpoint_day, rt_before, rt_after)
 }
 
-# construct_beta <- function(rt, t_I, n_t) {
-#   beta_t_all <- rt / t_I
-#   if(length(rt) == 1) {
-#     function(t) beta_t_all
-#   } else {
-#     approxfun(0:n_t, beta_t_all)
-#   }
-# }
-
 construct_beta <- function(rt, t_I, n_t) {
   beta_t_all <- rt / t_I
+  if(length(rt) == 1) {
+    function(t) beta_t_all
+  } else {
+    approxfun(0:n_t, beta_t_all)
+  }
 }
 
-simiulate_seir_ode_stoc <- function(
+simulate_seir_ode_stoch <- function(
     rt, t_E, t_I,
     N, S_init, E_init, I_init,
     n_t
 ) {
   beta <- construct_beta(rt, t_I, n_t)
-  
-  for(t in 1:n_t) {
-    inf <- rpois(1, beta[t]*I[t]*S[t])
-    rec <- rpois(1, gamma*I[t])
-    
-    S_new <- min(max(S[t]-inf,0),N)
-    I_new <- min(max(I[t]+inf-rec,0),N)
-    R_new <- min(max(R[t]+rec,0),N)
-    
-    S <- c(S,S_new)
-    I <- c(I,I_new)
-    R <- c(R,R_new)
+  if(t_E > 0) {
+    # SEIR model
+    S <- c(S_init)
+    E <- c(E_init)
+    I <- c(I_init)
+    R <- N - S - E - I
+    for(t in 1:n_t) {
+      dSE <- rpois(1, beta(t)*I[t]*S[t]/N)
+      dEI <- rpois(1, E[t]/t_E)
+      dIR <- rpois(1, I[t]/t_I)
+      
+      S_new <- min(max(S[t]-dSE,0),N)
+      E_new <- min(max(E[t]+dSE-dEI,0),N)
+      I_new <- min(max(I[t]+dEI-dIR,0),N)
+      R_new <- min(max(R[t]+dIR,0),N)
+      
+      S <- c(S,S_new)
+      E <- c(E,E_new)
+      I <- c(I,I_new)
+      R <- c(R,R_new)
+    }
+    seir_dt <- data.table(time=0:n_t,S=S,E=E,I=I,R=R)
+    return(seir_dt)
   }
-
+  else {
+    # SIR model
+    S <- c(S_init)
+    I <- c(I_init)
+    R <- N - S - I
+    for(t in 1:n_t) {
+      dSI <- rpois(1, beta(t)*I[t]*S[t]/N)
+      dIR <- rpois(1, I[t]/t_I)
+      
+      S_new <- min(max(S[t]-dSI,0),N)
+      I_new <- min(max(I[t]+dSI-dIR,0),N)
+      R_new <- min(max(R[t]+dIR,0),N)
+      
+      S <- c(S,S_new)
+      I <- c(I,I_new)
+      R <- c(R,R_new)
+    }
+    sir_dt <- data.table(time=0:n_t,S=S,I=I,R=R)
+    return(sir_dt)
+  }
 }
 
 simulate_seir_ode_det <- function(
@@ -58,8 +84,6 @@ simulate_seir_ode_det <- function(
     N, S_init, E_init, I_init,
     n_t
 ) {
-  library(deSolve)
-  
   beta <- construct_beta(rt, t_I, n_t)
   d_dt <- function(t, y, params) {
     dS <- y['S'] * beta(t) * y['I'] / N
@@ -99,10 +123,7 @@ simulate_seir_ode_det <- function(
     cum_dEI = 0
   )
   #automatic ode solver is lsoda, an "automatic stiff/non-stiff solver"
-  as.data.table(ode(y_init, 0:n_t, d_dt, NULL)) %>%
-    mutate(dS = cum_dS - lag(cum_dS, 1)) %>%
-    mutate(dEI = cum_dEI - lag(cum_dEI, 1)) %>%
-    mutate(dIR = R - lag(R, 1))
+  as.data.table(ode(y_init, 0:n_t, d_dt, NULL))
 }
 
 t_E = 0
@@ -113,14 +134,13 @@ E_init = 0
 I_init = 50
 S_init = 950
 
-rt <- logistic_curve(2.3, 0.6, n_t, 40, 0.5)
-rt <- heaviside(2.3, 0.6, n_t, 40)
+rt <- logistic_curve(2.3, 0.6, n_t, 5, 0.5)
+rt <- heaviside(2.3, 0.6, n_t, 5)
 
 seir_dt <- simulate_seir_ode_det(
   rt, t_E, t_I,
   N, S_init, E_init, I_init,
-  n_t,
-  n_steps_per_t = 1 # Ignored; included so the function signature matches stochastic version
+  n_t
 )
 
 long_seir_dt <- melt(seir_dt[,.(time,S,I,R)], id.vars = "time")
@@ -132,3 +152,15 @@ ggplot(data.table(day=seq(0,100),rt=heaviside(2.3, 0.6, 100, 40)),
        aes(x = day, y = rt)) + geom_point() + theme_bw()
 
 g <- ggplot(long_seir_dt, aes(x=time,y=value,color=variable)) + geom_line() + theme_bw()
+g
+
+seir_stoch_dt <- simulate_seir_ode_stoch(
+  rt, t_E, t_I,
+  N, S_init, E_init, I_init,
+  n_t
+)
+names(seir_stoch_dt) <- c("time", "S_stoch","I_stoch","R_stoch")
+merge_dt <- merge(seir_dt, seir_stoch_dt, by ="time")
+long_merge_dt <- melt(merge_dt[,.(time,S,I,R,S_stoch,I_stoch,R_stoch)], id.vars = "time")
+
+ggplot(long_merge_dt, aes(x=time,y=value,color=variable)) + geom_line() + theme_bw()
