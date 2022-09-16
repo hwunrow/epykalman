@@ -96,9 +96,7 @@ simulate_seir_ode_det <- function(
         S = -dS,
         E = dS - dEI,
         I = dEI - dIR,
-        R = dIR,
-        cum_dS = dS,
-        cum_dEI = dEI
+        R = dIR
       ), NULL)
     }
     else {
@@ -107,9 +105,7 @@ simulate_seir_ode_det <- function(
         S = -dS,
         E = 0,
         I = dS - dIR,
-        R = dIR,
-        cum_dS = dS,
-        cum_dEI = dS
+        R = dIR
       ), NULL)
     }
   }
@@ -118,9 +114,7 @@ simulate_seir_ode_det <- function(
     S = S_init,
     E = if(t_E > 0) E_init else 0,
     I = if(t_E > 0) I_init else E_init + I_init,
-    R = 0,
-    cum_dS = 0,
-    cum_dEI = 0
+    R = 0
   )
   #automatic ode solver is lsoda, an "automatic stiff/non-stiff solver"
   as.data.table(ode(y_init, 0:n_t, d_dt, NULL))
@@ -144,15 +138,6 @@ seir_dt <- simulate_seir_ode_det(
 )
 
 long_seir_dt <- melt(seir_dt[,.(time,S,I,R)], id.vars = "time")
-
-ggplot(data.table(day=seq(0,100),rt=logistic_curve(2.3, 0.6, n_t, 40, 0.5)),
-       aes(x = day, y = rt)) + geom_line() + geom_point() + theme_bw()
-
-ggplot(data.table(day=seq(0,100),rt=heaviside(2.3, 0.6, 100, 40)),
-       aes(x = day, y = rt)) + geom_point() + theme_bw()
-
-g <- ggplot(long_seir_dt, aes(x=time,y=value,color=variable)) + geom_line() + theme_bw()
-g
 
 seir_stoch_dt <- simulate_seir_ode_stoch(
   rt, t_E, t_I,
