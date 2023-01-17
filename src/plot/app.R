@@ -33,12 +33,12 @@ ui <- fluidPage(
           numericInput(
             "rt_before",
             h3("Rt before"),
-            value = 2.0
+            value = 2.8
           ),
           numericInput(
             "rt_after",
             h3("Rt after"),
-            value = 0.8
+            value = 1.3
           ),
           numericInput(
             "mid",
@@ -128,14 +128,15 @@ server <- function(input, output) {
         input$n_t
       )
       
-      names(seir_stoch_dt) <- c("time", "S_stoch","I_stoch","R_stoch")
+      names(seir_stoch_dt) <- c("time", "S_stoch","I_stoch","R_stoch","i")
       merge_dt <- merge(seir_dt, seir_stoch_dt, by ="time")
       return(merge_dt)
     })
     
     output$simPlot <- renderPlotly({
       merge_dt <- sirData()
-      long_merge_dt <- melt(merge_dt[,.(time,S,I,R,S_stoch,I_stoch,R_stoch)], id.vars = "time")
+      long_merge_dt <- melt(merge_dt[,.(time,S_stoch,I_stoch,R_stoch)], id.vars = "time")
+      long_merge_dt$value <- long_merge_dt$value / input$N
       g <- ggplot(long_merge_dt, aes(x=time,y=value,color=variable)) + geom_line() + theme_bw()
       ggplotly(g)
     })
