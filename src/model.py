@@ -1,9 +1,12 @@
 import pymc as pm
 import pytensor.tensor as pt
 from pytensor import scan
-import pytensor
 
 import numpy as np
+
+import arviz as az
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 class SIR_model():
@@ -16,7 +19,7 @@ class SIR_model():
         self.I0 = pm.floatX(self.data.I[0])
         self.S0 = pm.floatX(self.data.N - self.I0)
         self.i = self.data.i[1:]
-        self.n_t = len(self.i)
+        self.n_t = self.data.n_t
 
     def run_SIR_model(self, n_samples, n_tune, likelihood, prior, method):
         self.likelihood = likelihood
@@ -68,14 +71,13 @@ class SIR_model():
             pm.Deterministic("i", i)
             # print(model.initial_point())
             # print(model.point_logps())
-        
             pm.StudentT(
                 "i_est",
                 nu=likelihood['nu'],
                 mu=i,
                 sigma=np.maximum(
                     likelihood['min_sigma'],
-                    likelihood['sigma']*np.sqrt(self.i)),
+                    likelihood['sigma']*self.i),
                 observed=self.i
             )
 
@@ -95,3 +97,97 @@ class SIR_model():
         self.model = model
         self.trace = trace
         self.prior = prior_checks
+
+    def plot_likelihood(self, ax=None):
+        if not ax:
+            fig, ax = plt.subplots()
+        for x in range(4):
+            ax.plot(
+                self.model.trace.log_likelihood.sel(chain=x).mean(
+                    "draw").to_array().values.ravel(), label=f"chain {x+1}")
+            ax.legend()
+
+    def plot_trace(self, vars, ax=None):
+        if not ax:
+            fig, ax = plt.subplots()
+        lines = (
+            ('rt_0', {}, self.data.rt_0),
+            ('rt_1', {}, self.data.rt_1),
+            ('k', {}, self.data.k),
+            ('midpoint', {}, self.data.midpoint),
+            ('I0', {}, self.data.I0))
+        trace_plot = az.plot_trace(
+            self.model.trace, var_names=vars, lines=lines, figsize=(18, 20))
+        return(trace_plot)
+
+    def plot_posterior(self, vars, ax=None):
+        if not ax:
+            fig, ax = plt.subplots()
+        ref_val = {
+            "rt_0": [{"ref_val": self.data.rt_0}],
+            "rt_1": [{"ref_val": self.data.rt_1}],
+            "k": [{"ref_val": self.data.k}],
+            "midpoint": [{"ref_val": self.data.midpoint}],
+            "I0": [{"ref_val": self.data.I0}],
+            }
+        post_plot = az.plot_posterior(
+            self.model.trace,
+            var_names=vars,
+            ref_val=ref_val,
+            ref_val_color='red',
+            figsize=(20, 5),
+            )
+        return(post_plot)
+
+    def plot_prior_posterior(self, vars, ax=None):
+        if not ax:
+            fig, ax = plt.subplots()
+        self.model.trace.extend(self.model.prior)
+        prior_post_plot = az.plot_dist_comparison(
+            self.model.trace, var_names=vars)
+        return(prior_post_plot)
+
+    def plot_cov_corr(self, vars, ax=None):
+        if not ax:
+            fig, ax = plt.subplots()
+
+        def _flat_t(var):
+            x = self.model.trace.posterior[var].data
+            x = x.reshape((x.shape[0], np.prod(x.shape[1:], dtype=int)))
+            return x.mean(axis=0).flatten()
+
+        cov_matrix = np.cov(np.stack(list(map(_flat_t, vars))))
+        cov_plot = sns.heatmap(
+            cov_matrix, annot=True, xticklabels=vars, yticklabels=vars)
+
+        corr = np.corrcoef(np.stack(list(map(_flat_t, vars))))
+        corr_plot = sns.heatmap(
+            corr, annot=True, xticklabels=vars, yticklabels=vars)
+
+        return(cov_plot, corr_plot)
+
+    def parallel_coord(self, vars, ax=None):
+        if not ax:
+            fig, axs = plt.subplots(2)
+        # az.plot_parallel(
+        # sir_model.trace, var_names=vars, norm_method="normal")
+        _posterior = self.model.trace.posterior[vars].mean(
+            dim="chain").to_array().data
+
+        fig_parallel, axs = plt.subplots(2, figsize=(10, 10))
+
+        axs[0].plot(_posterior[:], color='black', alpha=0.1)
+        axs[0].tick_params(labelsize=10)
+        axs[0].set_xticks(range(len(vars)))
+        axs[0].set_xticklabels(vars)
+
+        # normalize
+        mean = np.mean(_posterior, axis=1)
+        sd = np.std(_posterior, axis=1)
+        for i in range(0, np.shape(mean)[0]):
+            _posterior[i, :] = (_posterior[i, :] - mean[i]) / sd[i]
+
+        axs[1].plot(_posterior[:], color='black', alpha=0.1)
+        axs[1].tick_params(labelsize=10)
+        axs[1].set_xticks(range(len(vars)))
+        axs[1].set_xticklabels(vars)
