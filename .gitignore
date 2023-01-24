@@ -1,5 +1,7 @@
 # jupyter
 .ipynb_checkpoints
+__pycache__
+.vscode
 
 # History files
 .Rhistory
