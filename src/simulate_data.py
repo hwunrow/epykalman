@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 
 
 class simulate_data():
@@ -28,7 +29,7 @@ class simulate_data():
 
         self.rt = self.sigmoid(rt_0, rt_1, midpoint, k, n_t)
 
-        self.S, self.I, self.R, self.i = self.generate_sir_stoch(
+        self.S, self.I, self.R, self.i, self.i_true = self.generate_sir_stoch(
             self.rt, t_I, N, S0, I0, n_t, **kwargs)
 
     def sigmoid(self, rt_0, rt_1, midpoint, k, n_t):
@@ -60,6 +61,7 @@ class simulate_data():
             R = np.append(R, R_new)
             i = np.append(i, dSI)
 
+        i_true = i
         if add_noise:
             i = i.astype('float64')
             obs_error_var = np.maximum(1., i[1:]**2 * noise_param)
@@ -67,7 +69,7 @@ class simulate_data():
             i[1:] += obs_error_sample * np.sqrt(obs_error_var)
             i = np.minimum(np.maximum(i, 0), N)
 
-        return S, Ir, R, i
+        return S, Ir, R, i, i_true
 
     def plot_rt(self, ax=None):
         if not ax:
@@ -110,3 +112,7 @@ class simulate_data():
 
         if path:
             plt.savefig(f'{path}/synthetic_data.pdf')
+
+    def save_data(self, path=None):
+        with open(f'{path}/data.pkl', 'wb') as file:
+            pickle.dump(self, file, pickle.HIGHEST_PROTOCOL)
