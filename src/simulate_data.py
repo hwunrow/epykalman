@@ -1,0 +1,112 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+class simulate_data():
+    def __init__(self, rt_0, rt_1, midpoint, k, n_t, t_I, N, S0, I0, **kwargs):
+        r"""
+        Args:
+          rt_0 (float): Rt value before midpoint
+          rt_1 (float): Rt value after midpoint
+          midpoint (int): Sigmoid midpoint
+          k (float): Logistic growth rate
+          n_t (int): Number of days
+          t_I (float):
+          N (int): Population
+          I0 (int): Intitial number of infectors
+        """
+        self.rt_0 = rt_0
+        self.rt_1 = rt_1
+        self.midpoint = midpoint
+        self.k = k
+        self.n_t = n_t
+
+        self.t_I = t_I
+        self.N = N
+        self.I0 = I0
+        self.S0 = N - I0
+
+        self.rt = self.sigmoid(rt_0, rt_1, midpoint, k, n_t)
+
+        self.S, self.I, self.R, self.i = self.generate_sir_stoch(
+            self.rt, t_I, N, S0, I0, n_t, **kwargs)
+
+    def sigmoid(self, rt_0, rt_1, midpoint, k, n_t):
+        """Computes sigmoid curve"""
+        t = np.arange(0, n_t)
+        sigmoid = rt_0 + (rt_1 - rt_0) / (1 + np.exp(-k*(t - midpoint)))
+        return sigmoid
+
+    def construct_beta(self, rt, t_I):
+        return rt / t_I
+
+    def generate_sir_stoch(self, rt, t_I, N, S0, I0, n_t,
+                           add_noise=False, noise_param=1/25):
+        beta = self.construct_beta(rt, t_I)
+        S = np.array([S0])
+        Ir = np.array([I0])
+        R = np.array([0])
+        i = np.array([0])
+        for t in range(n_t):
+            dSI = np.random.poisson(beta[t]*Ir[t]*S[t]/N)
+            dIR = np.random.poisson(Ir[t]/t_I)
+
+            S_new = min(max(S[t]-dSI, 0), N)
+            I_new = min(max(Ir[t]+dSI-dIR, 0), N)
+            R_new = min(max(R[t]+dIR, 0), N)
+
+            S = np.append(S, S_new)
+            Ir = np.append(Ir, I_new)
+            R = np.append(R, R_new)
+            i = np.append(i, dSI)
+
+        if add_noise:
+            i = i.astype('float64')
+            obs_error_var = np.maximum(1., i[1:]**2 * noise_param)
+            obs_error_sample = np.random.normal(0, 1, size=n_t)
+            i[1:] += obs_error_sample * np.sqrt(obs_error_var)
+            i = np.minimum(np.maximum(i, 0), N)
+
+        return S, Ir, R, i
+
+    def plot_rt(self, ax=None):
+        if not ax:
+            fig, ax = plt.subplots()
+        ax.plot(self.rt, '.-')
+        ax.set_title('Rt')
+
+    def plot_SIR(self, ax=None):
+        if not ax:
+            fig, ax = plt.subplots()
+        ax.plot(self.S, '.-', label='S')
+        ax.plot(self.I, '.-', label='I')
+        ax.plot(self.R, '.-', label='R')
+        ax.set_title('Stochastic SIR')
+        ax.legend()
+
+    def plot_obs(self, ax=None):
+        if not ax:
+            fig, ax = plt.subplots()
+        ax.plot(self.i, '.')
+        ax.set_title('Stochastic Daily Case Counts')
+
+    def plot_moving_average(self, ax=None):
+        def _moving_average(a, n=7):
+            ret = np.cumsum(a, dtype=float)
+            ret[n:] = ret[n:] - ret[:-n]
+            return ret[n - 1:] / n
+        if not ax:
+            fig, ax = plt.subplots()
+        ax.plot(_moving_average(np.diff(self.i, n=1), n=7))
+        ax.hlines(0, 0, 365, color='red')
+        ax.vlines(100, -160, 100, color='red')
+
+    def plot_all(self, path=None):
+        fig, axs = plt.subplots(2, 2, sharex=True, figsize=(10, 10))
+        self.plot_rt(axs[0, 0])
+        self.plot_SIR(axs[0, 1])
+        self.plot_obs(axs[1, 0])
+        fig.delaxes(axs[1, 1])
+
+        if path:
+            plt.savefig(f'{path}/synthetic_data.pdf')
