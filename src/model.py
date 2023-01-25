@@ -8,6 +8,9 @@ import arviz as az
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+import pickle
+import cloudpickle
+
 
 class SIR_model():
 
@@ -191,3 +194,7 @@ class SIR_model():
         axs[1].tick_params(labelsize=10)
         axs[1].set_xticks(range(len(vars)))
         axs[1].set_xticklabels(vars)
+
+    def save_model(self, path=None):
+        with open(f'{path}/model.pkl', 'wb') as file:
+            cloudpickle.dump(self, file, pickle.HIGHEST_PROTOCOL)
