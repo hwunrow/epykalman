@@ -6,6 +6,7 @@ import logging
 import os
 
 import numpy as np
+import pandas as pd
 
 import arviz as az
 import matplotlib.pyplot as plt
@@ -35,6 +36,7 @@ class SIR_model():
         self.n_tune = n_tune
         self.likelihood = likelihood
         self.prior = prior
+        self.method = method
 
         if not os.path.exists(path):
             os.makedirs(path)
@@ -122,6 +124,28 @@ class SIR_model():
         self.model = model
         self.trace = trace
         self.prior = prior_checks
+
+        gv = pm.model_to_graphviz(model)
+        gv.render(filename=f'{path}/model', format='pdf')
+
+    def sample_stats(self):
+        if self.method == "metropolis":
+            acc_rate = self.trace.sample_stats['accepted'].sum(axis=1).data / \
+                self.n_samples
+            acc_rate = pd.DataFrame(acc_rate, columns=vars)
+        elif self.method == "NUTS":
+            acc_rate = self.trace.sample_stats['accepted'].sum(dim="draw").\
+                data / self.n_samples
+
+        summary_df = az.summary(self.trace, var_names=vars).round(2)
+        summary_df['truth'] = [
+            self.data.rt_0, self.data.rt_1, self.data.k, self.data.midpoint,
+            self.data.I0]
+
+        logging.info(f'trace summary:\n {summary_df}')
+        logging.info(f'acceptance_rate:\n {acc_rate}')
+
+        return(summary_df)
 
     def plot_likelihood(self, ax=None):
         if not ax:
