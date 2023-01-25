@@ -2,6 +2,9 @@ import pymc as pm
 import pytensor.tensor as pt
 from pytensor import scan
 
+import logging
+import os
+
 import numpy as np
 
 import arviz as az
@@ -24,12 +27,31 @@ class SIR_model():
         self.i = self.data.i[1:]
         self.n_t = self.data.n_t
 
-    def run_SIR_model(self, n_samples, n_tune, likelihood, prior, method):
+    def run_SIR_model(
+      self, n_samples, n_tune, likelihood, prior, method, path
+      ):
         self.likelihood = likelihood
         self.n_samples = n_samples
         self.n_tune = n_tune
         self.likelihood = likelihood
         self.prior = prior
+
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        logging.basicConfig(
+            filename=f'{path}/example.log', encoding='utf-8',
+            level=logging.DEBUG)
+        logging.info(
+            f'true values rt_0: {self.data.rt_0},rt_1: {self.data.rt_1}, \
+                midpoint: {self.data.midpoint}, k: {self.data.k}')
+        logging.info(f'fixed parameters t_I: {self.data.t_I}, N: \
+            {self.data.N}, S_init: {self.data.S0}, I_init: {self.data.I0}')
+
+        logging.info(f'likelihood: {likelihood}')
+        logging.info(f'prior parameters: {prior}')
+        logging.info(f'MCMC method: {method}')
+        logging.info(f'Number of draws: {n_samples} Burn in: {n_tune}')
 
         with pm.Model() as model:
             rt_0 = pm.Uniform(
