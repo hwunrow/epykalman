@@ -10,6 +10,7 @@ import pandas as pd
 
 import arviz as az
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 
 import pickle
@@ -43,7 +44,7 @@ class SIR_model():
 
         logging.basicConfig(
             filename=f'{path}/example.log', encoding='utf-8',
-            level=logging.DEBUG)
+            level=logging.INFO)
         logging.info(
             f'true values rt_0: {self.data.rt_0},rt_1: {self.data.rt_1}, \
                 midpoint: {self.data.midpoint}, k: {self.data.k}')
@@ -128,7 +129,7 @@ class SIR_model():
         gv = pm.model_to_graphviz(model)
         gv.render(filename=f'{path}/model', format='pdf')
 
-    def sample_stats(self):
+    def sample_stats(self, vars):
         if self.method == "metropolis":
             acc_rate = self.trace.sample_stats['accepted'].sum(axis=1).data / \
                 self.n_samples
@@ -145,42 +146,27 @@ class SIR_model():
         logging.info(f'trace summary:\n {summary_df}')
         logging.info(f'acceptance_rate:\n {acc_rate}')
 
-        return(summary_df)
+        return(summary_df, acc_rate)
 
-    def plot_likelihood(self, ax=None):
-        if not ax:
-            fig, ax = plt.subplots()
+    def plot_likelihood(self):
+        fig, ax = plt.subplots()
         for x in range(4):
             ax.plot(
-                self.model.trace.log_likelihood.sel(chain=x).mean(
+                self.trace.log_likelihood.sel(chain=x).mean(
                     "draw").to_array().values.ravel(), label=f"chain {x+1}")
             ax.legend()
+        return(fig)
 
-    def plot_trace(self, vars, ax=None):
-        if not ax:
-            fig, ax = plt.subplots()
-        lines = (
-            ('rt_0', {}, self.data.rt_0),
-            ('rt_1', {}, self.data.rt_1),
-            ('k', {}, self.data.k),
-            ('midpoint', {}, self.data.midpoint),
-            ('I0', {}, self.data.I0))
+    def plot_trace(self, vars):
+        lines = [(var, {}, getattr(self.data, var)) for var in vars]
         trace_plot = az.plot_trace(
-            self.model.trace, var_names=vars, lines=lines, figsize=(18, 20))
+            self.trace, var_names=vars, lines=lines, figsize=(18, 20))
         return(trace_plot)
 
-    def plot_posterior(self, vars, ax=None):
-        if not ax:
-            fig, ax = plt.subplots()
-        ref_val = {
-            "rt_0": [{"ref_val": self.data.rt_0}],
-            "rt_1": [{"ref_val": self.data.rt_1}],
-            "k": [{"ref_val": self.data.k}],
-            "midpoint": [{"ref_val": self.data.midpoint}],
-            "I0": [{"ref_val": self.data.I0}],
-            }
+    def plot_posterior(self, vars):
+        ref_val = {var: [{"ref_val": getattr(self.data, var)}] for var in vars}
         post_plot = az.plot_posterior(
-            self.model.trace,
+            self.trace,
             var_names=vars,
             ref_val=ref_val,
             ref_val_color='red',
@@ -188,42 +174,42 @@ class SIR_model():
             )
         return(post_plot)
 
-    def plot_prior_posterior(self, vars, ax=None):
-        if not ax:
-            fig, ax = plt.subplots()
-        self.model.trace.extend(self.model.prior)
+    def plot_prior_posterior(self, vars):
+        self.trace.extend(self.prior)
         prior_post_plot = az.plot_dist_comparison(
-            self.model.trace, var_names=vars)
+            self.trace, var_names=vars)
         return(prior_post_plot)
 
     def plot_cov_corr(self, vars, ax=None):
-        if not ax:
-            fig, ax = plt.subplots()
+        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 4))
 
         def _flat_t(var):
-            x = self.model.trace.posterior[var].data
+            x = self.trace.posterior[var].data
             x = x.reshape((x.shape[0], np.prod(x.shape[1:], dtype=int)))
             return x.mean(axis=0).flatten()
 
         cov_matrix = np.cov(np.stack(list(map(_flat_t, vars))))
-        cov_plot = sns.heatmap(
-            cov_matrix, annot=True, xticklabels=vars, yticklabels=vars)
+        sns.heatmap(
+            cov_matrix, annot=True, xticklabels=vars,
+            yticklabels=vars, ax=axs[0])
 
         corr = np.corrcoef(np.stack(list(map(_flat_t, vars))))
-        corr_plot = sns.heatmap(
-            corr, annot=True, xticklabels=vars, yticklabels=vars)
+        sns.heatmap(
+            corr, annot=True, xticklabels=vars,
+            yticklabels=vars, ax=axs[1])
 
-        return(cov_plot, corr_plot)
+        return(fig)
 
-    def parallel_coord(self, vars, ax=None):
-        if not ax:
-            fig, axs = plt.subplots(2)
-        # az.plot_parallel(
-        # sir_model.trace, var_names=vars, norm_method="normal")
-        _posterior = self.model.trace.posterior[vars].mean(
-            dim="chain").to_array().data
+    def plot_parallel_coord(self, vars):
+        if self.method == self.method == "NUTS":
+            par_plot = az.plot_parallel(
+                self.trace, var_names=vars, norm_method="normal")
+            return(par_plot.figure)
 
-        fig_parallel, axs = plt.subplots(2, figsize=(10, 10))
+        _posterior = self.trace.posterior[vars].stack(
+            chain_draw=['chain', 'draw']).to_array().data
+
+        fig, axs = plt.subplots(2, figsize=(10, 10))
 
         axs[0].plot(_posterior[:], color='black', alpha=0.1)
         axs[0].tick_params(labelsize=10)
@@ -231,15 +217,127 @@ class SIR_model():
         axs[0].set_xticklabels(vars)
 
         # normalize
-        mean = np.mean(_posterior, axis=1)
-        sd = np.std(_posterior, axis=1)
+        mean = self.trace.posterior[vars].mean().to_array().data
+        sd = self.trace.posterior[vars].std().to_array().data
         for i in range(0, np.shape(mean)[0]):
             _posterior[i, :] = (_posterior[i, :] - mean[i]) / sd[i]
 
-        axs[1].plot(_posterior[:], color='black', alpha=0.1)
+        axs[1].plot(_posterior[:], color='black', alpha=0.05)
         axs[1].tick_params(labelsize=10)
         axs[1].set_xticks(range(len(vars)))
         axs[1].set_xticklabels(vars)
+
+        return(fig)
+
+    def plot_sir(self, plot_chain=False):
+        fig, ax = plt.subplots(2, 2, sharex=True, figsize=(15, 15))
+
+        i_ci = az.hdi(
+            self.trace, var_names=["i"], hdi_prob=0.95
+            ).to_array().squeeze().data
+        i_mean = self.trace.posterior['i'].mean(dim=["chain", "draw"]).data
+        S_ci = az.hdi(
+            self.trace, var_names=["S"], hdi_prob=0.95
+            ).to_array().squeeze().data
+        S_mean = self.trace.posterior['S'].mean(dim=["chain", "draw"]).data
+        I_ci = az.hdi(
+            self.trace, var_names=["I"], hdi_prob=0.95
+            ).to_array().squeeze().data
+        I_mean = self.trace.posterior['I'].mean(dim=["chain", "draw"]).data
+
+        if plot_chain:  # plot mean of each chain
+            for x in range(4):
+                ax[0, 0].plot(
+                    self.trace.posterior["i"].data.mean(axis=1)[x],
+                    '.', label=f'chain {x+1}')
+                ax[0, 1].plot(
+                    self.trace.posterior["S"].data.mean(axis=1)[x],
+                    '.', label=f'chain {x+1}')
+                ax[1, 0].plot(
+                    self.trace.posterior["I"].data.mean(axis=1)[x],
+                    '.', label=f'chain {x+1}')
+        else:  # plot 95% HDI
+            ax[0, 0].fill_between(
+                range(self.n_t), i_ci[:, 0], i_ci[:, 1], facecolor='gray',
+                alpha=0.3, label='95% HDI')
+            ax[0, 0].plot(i_mean, '--', label="posterior mean", color='gray')
+            ax[0, 1].fill_between(
+                range(self.n_t), S_ci[:, 0], S_ci[:, 1], facecolor='gray',
+                alpha=0.3, label='95% HDI')
+            ax[0, 1].plot(S_mean, '--', label="posterior mean", color='gray')
+            ax[1, 0].fill_between(
+                range(self.n_t), I_ci[:, 0], I_ci[:, 1], facecolor='gray',
+                alpha=0.3, label='95% HDI')
+            ax[1, 0].plot(I_mean, '--', label="posterior mean", color='gray')
+
+        ax[0, 0].plot(self.data.i, '.', label="obs", color='black')
+        ax[0, 0].set_xlabel('day')
+        ax[0, 0].set_ylabel('Daily case counts')
+        ax[0, 0].legend()
+
+        ax[0, 1].plot(self.data.S, '.', label="truth", color='black')
+        ax[0, 1].set_xlabel('day')
+        ax[0, 1].set_ylabel('Susceptible')
+        ax[0, 1].legend()
+
+        ax[1, 0].plot(self.data.I, '.', label="truth", color='black')
+        ax[1, 0].set_xlabel('day')
+        ax[1, 0].set_ylabel('Infected')
+        ax[1, 0].legend()
+
+        fig.delaxes(ax[1, 1])
+
+        return(fig)
+
+    def plot_rt(self):
+        prop_cycle = plt.rcParams['axes.prop_cycle']
+        colors = prop_cycle.by_key()['color']
+
+        fig, ax = plt.subplots(2, figsize=(10, 15))
+
+        for x in range(4):
+            ax[0].plot(
+                self.trace.posterior["Rt"].data.mean(axis=1)[x],
+                label=f"chain {x+1}", color=colors[x])
+
+        ax[0].plot(self.data.rt, label="truth", color='black')
+        ax[0].set_xlabel('day')
+        ax[0].set_ylabel('Rt')
+        ax[0].legend()
+
+        rt_ci = az.hdi(
+            self.trace, var_names="Rt", hdi_prob=0.95
+            ).to_array().squeeze().data
+        mean = self.trace.posterior['Rt'].mean(dim=["chain", "draw"]).data
+
+        ax[1].fill_between(
+            range(self.n_t), rt_ci[:, 0], rt_ci[:, 1],
+            facecolor='gray', alpha=0.3, label='95% HDI')
+        ax[1].plot(mean, '--', label="posterior mean", color='gray')
+        ax[1].plot(self.data.rt, label="truth", color='black')
+        ax[1].legend()
+
+        return(fig)
+
+    def plot_all(self, vars, path=None):
+        trace_plot = self.plot_trace(vars)
+        post_plot = self.plot_posterior(vars)
+        prior_post_plot = self.plot_prior_posterior(vars)
+        cov_corr_plot = self.plot_cov_corr(vars)
+        fig_parallel = self.plot_parallel_coord(vars)
+        fig_sir = self.plot_sir(plot_chain=True)
+        fig_sir_ci = self.plot_sir()
+        fig_Rt = self.plot_rt()
+
+        with PdfPages(f'{path}/mcmc_plots.pdf') as pdf:
+            pdf.savefig(trace_plot.ravel()[0].figure)
+            pdf.savefig(post_plot.ravel()[0].figure)
+            pdf.savefig(prior_post_plot.ravel()[0].figure)
+            pdf.savefig(cov_corr_plot)
+            pdf.savefig(fig_parallel)
+            pdf.savefig(fig_sir)
+            pdf.savefig(fig_sir_ci)
+            pdf.savefig(fig_Rt)
 
     def save_model(self, path=None):
         with open(f'{path}/model.pkl', 'wb') as file:
