@@ -4,6 +4,7 @@ from pytensor import scan
 
 import logging
 import os
+from pprint import pformat
 
 import numpy as np
 import pandas as pd
@@ -45,14 +46,25 @@ class SIR_model():
         logging.basicConfig(
             filename=f'{path}/example.log', encoding='utf-8',
             level=logging.INFO)
-        logging.info(
-            f'true values rt_0: {self.data.rt_0},rt_1: {self.data.rt_1}, \
-                midpoint: {self.data.midpoint}, k: {self.data.k}')
-        logging.info(f'fixed parameters t_I: {self.data.t_I}, N: \
-            {self.data.N}, S_init: {self.data.S0}, I_init: {self.data.I0}')
-
-        logging.info(f'likelihood: {likelihood}')
-        logging.info(f'prior parameters: {prior}')
+        true_params = {
+            'rt_0': self.data.rt_0,
+            'rt_1': self.data.rt_1,
+            'k': self.data.k,
+            'midpoint': self.data.midpoint,
+            'I0': self.data.I0,
+            'N': self.data.N
+        }
+        fixed_vars = []
+        for k, v in prior.items():
+            if v['dist'] == "constant":
+                fixed_vars.append(k)
+        fixed_params = {v: true_params[v] for v in fixed_vars} | {
+            't_I': self.data.t_I,
+            'N': self.data.N,
+        }
+        logging.info(f'fixed parameters {pformat(fixed_params)}')
+        logging.info(f'likelihood: {pformat(likelihood)}')
+        logging.info(f'prior parameters: {pformat(prior)}')
         logging.info(f'MCMC method: {method}')
         logging.info(f'Number of draws: {n_samples} Burn in: {n_tune}')
 
