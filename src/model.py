@@ -333,6 +333,8 @@ class SIR_model():
             facecolor='gray', alpha=0.3, label='95% HDI')
         ax[1].plot(mean, '--', label="posterior mean", color='gray')
         ax[1].plot(self.data.rt, label="truth", color='black')
+        ax[1].set_xlabel('day')
+        ax[1].set_ylabel('Rt')
         ax[1].legend()
 
         return(fig)
