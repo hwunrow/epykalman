@@ -57,15 +57,28 @@ class SIR_model():
         logging.info(f'Number of draws: {n_samples} Burn in: {n_tune}')
 
         with pm.Model() as model:
-            rt_0 = pm.Uniform(
-                "rt_0", self.prior['rt_0_a'], self.prior['rt_0_b'])
-            rt_1 = pm.Uniform(
-                "rt_1", self.prior['rt_1_a'], self.prior['rt_1_b'])
-            k = pm.Uniform("k", self.prior['k_a'], self.prior['k_b'])
-            midpoint = pm.DiscreteUniform(
-                "midpoint", self.prior['m_a'], self.prior['m_b'])
+            if prior['rt_0']['dist'] == "constant":
+                rt_0 = prior['rt_0']['args']['value']
+            else:
+                rt_0 = prior['rt_0']['dist']("rt_0", **prior['rt_0']['args'])
 
-            I0 = pm.Poisson("I0", self.prior["I0_lambda"])
+            if prior['rt_1']['dist'] == "constant":
+                rt_1 = prior['rt_1']['args']['value']
+            else:
+                rt_1 = prior['rt_1']['dist']("rt_1", **prior['rt_1']['args'])
+
+            if prior['k']['dist'] == "constant":
+                k = prior['k']['args']['value']
+            else:
+                k = prior['k']['dist']("k", **prior['k']['args'])
+
+            if prior['midpoint']['dist'] == "constant":
+                midpoint = prior['midpoint']['args']['value']
+            else:
+                midpoint = prior['midpoint']['dist'](
+                    "midpoint", **prior['midpoint']['args'])
+
+            I0 = prior['I0']['dist']("I0", **prior['I0']['args'])
             S0 = pm.Deterministic("S0", self.data.N - I0)
 
             t = np.arange(self.n_t)
@@ -139,9 +152,14 @@ class SIR_model():
                 data / self.n_samples
 
         summary_df = az.summary(self.trace, var_names=vars).round(2)
-        summary_df['truth'] = [
-            self.data.rt_0, self.data.rt_1, self.data.k, self.data.midpoint,
-            self.data.I0]
+        true_params = {
+            'rt_0': self.data.rt_0,
+            'rt_1': self.data.rt_1,
+            'k': self.data.k,
+            'midpoint': self.data.midpoint,
+            'I0': self.data.I0,
+        }
+        summary_df['truth'] = [true_params[v] for v in vars]
 
         logging.info(f'trace summary:\n {summary_df}')
         logging.info(f'acceptance_rate:\n {acc_rate}')
