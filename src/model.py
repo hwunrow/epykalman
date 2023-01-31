@@ -98,7 +98,7 @@ class SIR_model():
                 "Rt", rt_0 + (rt_1 - rt_0) / (1. + np.exp(-k*(t - midpoint))))
             beta_t = pm.Deterministic("beta_t", Rt / self.data.t_I)
 
-            def next_day(beta_t, S_t, I_t, _, t_I, N, dt=1):
+            def next_day(b, S_t, I_t, _, t_I, N, dt=1):
                 dSI = (beta_t * I_t * S_t / N) * dt
                 dIR = (I_t / t_I) * dt
                 S_t = S_t - dSI
@@ -124,15 +124,27 @@ class SIR_model():
             pm.Deterministic("i", i)
             # print(model.initial_point())
             # print(model.point_logps())
-            pm.StudentT(
-                "i_est",
-                nu=likelihood['nu'],
-                mu=i,
-                sigma=np.maximum(
-                    likelihood['min_sigma'],
-                    likelihood['sigma']*self.i),
-                observed=self.i
-            )
+            if likelihood['dist'] == 'students-t':
+                like = pm.StudentT(
+                    "i_est",
+                    nu=likelihood['nu'],
+                    mu=i,
+                    sigma=1+likelihood['sigma']*i,
+                    observed=self.i
+                )
+            elif likelihood['dist'] == 'normal':
+                like = pm.Normal(
+                    "i_est",
+                    mu=i,
+                    sigma=np.maximum(
+                        likelihood['min_sigma'],
+                        likelihood['sigma']*i),
+                    observed=self.i
+                )
+            else:
+                raise Exception("Likelihood dist must be studens-t or normal")
+     
+            pm.Deterministic("likelihood", like)
 
             if method == 'metropolis':
                 step = pm.Metropolis()
