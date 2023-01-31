@@ -143,7 +143,7 @@ class SIR_model():
                 )
             else:
                 raise Exception("Likelihood dist must be studens-t or normal")
-     
+
             pm.Deterministic("likelihood", like)
 
             if method == 'metropolis':
