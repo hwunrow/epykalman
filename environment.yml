@@ -1,0 +1,13 @@
+name: rt-estimation
+channels:
+  - defaults
+dependencies:
+  - jupyterlab
+  - pymc
+  - aesara
+  - plotly
+  - python-graphviz
+  - seaborn
+  - ruptures
+  - flake8
+prefix: C:\Users\hyone\anaconda3\envs\rt-estimation
