@@ -99,7 +99,7 @@ class SIR_model():
             beta_t = pm.Deterministic("beta_t", Rt / self.data.t_I)
 
             def next_day(b, S_t, I_t, _, t_I, N, dt=1):
-                dSI = (beta_t * I_t * S_t / N) * dt
+                dSI = (b * I_t * S_t / N) * dt
                 dIR = (I_t / t_I) * dt
                 S_t = S_t - dSI
                 I_t = I_t + dSI - dIR
@@ -129,16 +129,14 @@ class SIR_model():
                     "i_est",
                     nu=likelihood['nu'],
                     mu=i,
-                    sigma=1+likelihood['sigma']*i,
+                    sigma=pt.abs(1+likelihood['sigma']*i),
                     observed=self.i
                 )
             elif likelihood['dist'] == 'normal':
                 like = pm.Normal(
                     "i_est",
                     mu=i,
-                    sigma=np.maximum(
-                        likelihood['min_sigma'],
-                        likelihood['sigma']*i),
+                    sigma=pt.abs(1+likelihood['sigma']*i),
                     observed=self.i
                 )
             else:
@@ -149,7 +147,7 @@ class SIR_model():
             if method == 'metropolis':
                 step = pm.Metropolis()
             elif method == 'NUTS':
-                step = pm.NUTS()
+                step = pm.NUTS(adapt_step_size=True, target_accept=0.99)
             else:
                 raise Exception("Method must be either 'metropolis' or 'NUTS'")
             trace = pm.sample(
