@@ -139,6 +139,16 @@ class SIR_model():
                     sigma=pt.abs(1+likelihood['sigma']*i),
                     observed=self.i
                 )
+            elif likelihood['dist'] == 'negbin':
+                alpha_inv = pm.Normal(name="alpha_inv", mu=0, sigma=0.5)
+                alpha = pm.Deterministic(
+                    name="alpha", var=1 / pm.math.sqr(alpha_inv))
+                like = pm.NegativeBinomial(
+                    "i_est",
+                    alpha=alpha,
+                    mu=i,
+                    observed=self.i
+                )
             else:
                 raise Exception("Likelihood dist must be studens-t or normal")
 
@@ -147,7 +157,8 @@ class SIR_model():
             if method == 'metropolis':
                 step = pm.Metropolis()
             elif method == 'NUTS':
-                step = pm.NUTS(adapt_step_size=True, target_accept=0.99)
+                step = pm.NUTS(adapt_step_size=True)
+                pm.init_nuts(init='advi', n_init=500_000)
             else:
                 raise Exception("Method must be either 'metropolis' or 'NUTS'")
             trace = pm.sample(
@@ -156,10 +167,12 @@ class SIR_model():
         with model:
             pm.compute_log_likelihood(trace)
             prior_checks = pm.sample_prior_predictive(n_samples)
+            posterior_predictive = pm.sample_posterior_predictive(trace)
 
         self.model = model
         self.trace = trace
         self.prior = prior_checks
+        self.posterior_predictive = posterior_predictive
 
         gv = pm.model_to_graphviz(model)
         gv.render(filename=f'{path}/model', format='pdf')
