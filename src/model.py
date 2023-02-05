@@ -101,6 +101,14 @@ class SIR_model():
             def next_day(b, S_t, I_t, _, t_I, N, dt=1):
                 dSI = (b * I_t * S_t / N) * dt
                 dIR = (I_t / t_I) * dt
+                # dSI = pm.Poisson("dSI", (b * I_t * S_t / N) * dt)
+                # dIR = pm.Poisson("dIR", (I_t / t_I) * dt)
+
+                obs_error_var = pm.math.maximum(1., dSI**2 * 0.2)
+                obs_error_sample = np.random.normal(0, 1)
+                dSI += obs_error_sample * np.sqrt(obs_error_var)
+                # dSI = pt.clip(dSI, 0., N)
+
                 S_t = S_t - dSI
                 I_t = I_t + dSI - dIR
                 S_t = pt.clip(S_t, 0., N)
@@ -125,18 +133,23 @@ class SIR_model():
             # print(model.initial_point())
             # print(model.point_logps())
             if likelihood['dist'] == 'students-t':
+                sigma = pm.HalfCauchy("sigma", 10)
                 like = pm.StudentT(
                     "i_est",
                     nu=likelihood['nu'],
                     mu=i,
-                    sigma=pt.abs(1+likelihood['sigma']*i),
+                    # sigma=pt.abs(1+likelihood['sigma']*i),
+                    sigma=pt.abs(1+sigma*i),
+                    # sigma=pt.abs(1+sigma*i)
                     observed=self.i
                 )
             elif likelihood['dist'] == 'normal':
+                sigma = pm.HalfCauchy("sigma", 10)
                 like = pm.Normal(
                     "i_est",
                     mu=i,
-                    sigma=pt.abs(1+likelihood['sigma']*i),
+                    # sigma=pt.abs(1+likelihood['sigma']*i),
+                    sigma=pt.abs(1+sigma*i),
                     observed=self.i
                 )
             elif likelihood['dist'] == 'negbin':
@@ -145,7 +158,7 @@ class SIR_model():
                     name="alpha", var=1 / pm.math.sqr(alpha_inv))
                 like = pm.NegativeBinomial(
                     "i_est",
-                    alpha=alpha,
+                    alpha=pt.abs(alpha+0.01),
                     mu=i,
                     observed=self.i
                 )
@@ -158,7 +171,7 @@ class SIR_model():
                 step = pm.Metropolis()
             elif method == 'NUTS':
                 step = pm.NUTS(adapt_step_size=True)
-                pm.init_nuts(init='advi', n_init=500_000)
+                # pm.init_nuts(init='advi', n_init=500_000)
             else:
                 raise Exception("Method must be either 'metropolis' or 'NUTS'")
             trace = pm.sample(
@@ -193,6 +206,7 @@ class SIR_model():
             'k': self.data.k,
             'midpoint': self.data.midpoint,
             'I0': self.data.I0,
+            'sigma': None,
         }
         summary_df['truth'] = [true_params[v] for v in vars]
 
@@ -213,14 +227,14 @@ class SIR_model():
     def plot_trace(self, vars):
         lines = [(var, {}, getattr(self.data, var)) for var in vars]
         trace_plot = az.plot_trace(
-            self.trace, var_names=vars, lines=lines, figsize=(18, 20))
+            self.trace, var_names=vars+['sigma'], lines=lines, figsize=(18, 20))
         return(trace_plot)
 
     def plot_posterior(self, vars):
         ref_val = {var: [{"ref_val": getattr(self.data, var)}] for var in vars}
         post_plot = az.plot_posterior(
             self.trace,
-            var_names=vars,
+            var_names=vars+['sigma'],
             ref_val=ref_val,
             ref_val_color='red',
             figsize=(20, 5),
@@ -285,19 +299,6 @@ class SIR_model():
     def plot_sir(self, plot_chain=False):
         fig, ax = plt.subplots(2, 2, sharex=True, figsize=(15, 15))
 
-        i_ci = az.hdi(
-            self.trace, var_names=["i"], hdi_prob=0.95
-            ).to_array().squeeze().data
-        i_mean = self.trace.posterior['i'].mean(dim=["chain", "draw"]).data
-        S_ci = az.hdi(
-            self.trace, var_names=["S"], hdi_prob=0.95
-            ).to_array().squeeze().data
-        S_mean = self.trace.posterior['S'].mean(dim=["chain", "draw"]).data
-        I_ci = az.hdi(
-            self.trace, var_names=["I"], hdi_prob=0.95
-            ).to_array().squeeze().data
-        I_mean = self.trace.posterior['I'].mean(dim=["chain", "draw"]).data
-
         if plot_chain:  # plot mean of each chain
             for x in range(4):
                 ax[0, 0].plot(
@@ -310,18 +311,62 @@ class SIR_model():
                     self.trace.posterior["I"].data.mean(axis=1)[x],
                     '.', label=f'chain {x+1}')
         else:  # plot 95% HDI
-            ax[0, 0].fill_between(
-                range(self.n_t), i_ci[:, 0], i_ci[:, 1], facecolor='gray',
-                alpha=0.3, label='95% HDI')
-            ax[0, 0].plot(i_mean, '--', label="posterior mean", color='gray')
-            ax[0, 1].fill_between(
-                range(self.n_t), S_ci[:, 0], S_ci[:, 1], facecolor='gray',
-                alpha=0.3, label='95% HDI')
-            ax[0, 1].plot(S_mean, '--', label="posterior mean", color='gray')
-            ax[1, 0].fill_between(
-                range(self.n_t), I_ci[:, 0], I_ci[:, 1], facecolor='gray',
-                alpha=0.3, label='95% HDI')
-            ax[1, 0].plot(I_mean, '--', label="posterior mean", color='gray')
+            az.plot_hdi(
+                x=range(self.n_t),
+                y=self.trace.posterior["i"],
+                hdi_prob=0.5,
+                color="gray",
+                smooth=False,
+                fill_kwargs={"label": "HDI 50%", "alpha": 0.3},
+                ax=ax[0, 0],
+            )
+            az.plot_hdi(
+                x=range(self.n_t),
+                y=self.trace.posterior["i"],
+                hdi_prob=0.95,
+                color="gray",
+                smooth=False,
+                fill_kwargs={"label": "HDI 95%", "alpha": 0.5},
+                ax=ax[0, 0],
+            )
+
+            az.plot_hdi(
+                x=range(self.n_t),
+                y=self.trace.posterior["S"],
+                hdi_prob=0.5,
+                color="gray",
+                smooth=False,
+                fill_kwargs={"label": "HDI 50%", "alpha": 0.3},
+                ax=ax[0, 1],
+            )
+            az.plot_hdi(
+                x=range(self.n_t),
+                y=self.trace.posterior["S"],
+                hdi_prob=0.95,
+                color="gray",
+                smooth=False,
+                fill_kwargs={"label": "HDI 95%", "alpha": 0.5},
+                ax=ax[0, 1],
+            )
+
+            az.plot_hdi(
+                x=range(self.n_t),
+                y=self.trace.posterior["I"],
+                hdi_prob=0.5,
+                color="gray",
+                smooth=False,
+                fill_kwargs={"label": "HDI 50%", "alpha": 0.3},
+                ax=ax[1, 0],
+            )
+            az.plot_hdi(
+                x=range(self.n_t),
+                y=self.trace.posterior["I"],
+                hdi_prob=0.95,
+                color="gray",
+                smooth=False,
+                fill_kwargs={"label": "HDI 95%", "alpha": 0.5},
+                ax=ax[1, 0],
+            )
 
         ax[0, 0].plot(self.data.i, '.', label="obs", color='black')
         ax[0, 0].set_xlabel('day')
@@ -373,6 +418,35 @@ class SIR_model():
         ax[1].legend()
 
         return(fig)
+   
+    def plot_ppc(self):
+        fig, ax = plt.subplots()
+        t = range(self.n_t)
+
+        ax.plot(t, self.data.i[1:], '.', color="black", label="obs")
+
+        az.plot_hdi(
+            x=t,
+            y=self.posterior_predictive.posterior_predictive["i_est"],
+            hdi_prob=0.95,
+            color="gray",
+            smooth=False,
+            fill_kwargs={"label": "HDI 50%", "alpha": 0.3},
+            ax=ax,
+        )
+        az.plot_hdi(
+            x=t,
+            y=self.posterior_predictive.posterior_predictive["i_est"],
+            hdi_prob=0.5,
+            color="gray",
+            smooth=False,
+            fill_kwargs={"label": "HDI 95%", "alpha": 0.5},
+            ax=ax,
+        )
+        ax.legend(loc="upper left")
+        ax.set(title="Posterior Predictive HDI SIR Model")
+
+        return(fig)
 
     def plot_all(self, vars, path=None):
         trace_plot = self.plot_trace(vars)
@@ -383,6 +457,7 @@ class SIR_model():
         fig_sir = self.plot_sir(plot_chain=True)
         fig_sir_ci = self.plot_sir()
         fig_Rt = self.plot_rt()
+        fig_ppc = self.plot_ppc()
 
         with PdfPages(f'{path}/mcmc_plots.pdf') as pdf:
             pdf.savefig(trace_plot.ravel()[0].figure)
@@ -393,6 +468,7 @@ class SIR_model():
             pdf.savefig(fig_sir)
             pdf.savefig(fig_sir_ci)
             pdf.savefig(fig_Rt)
+            pdf.savefig(fig_ppc)
 
     def save_model(self, path=None):
         with open(f'{path}/model.pkl', 'wb') as file:
