@@ -4,7 +4,10 @@ import pickle
 
 
 class simulate_data():
-    def __init__(self, rt_0, rt_1, midpoint, k, n_t, t_I, N, S0, I0, **kwargs):
+    def __init__(
+            self, rt_0, rt_1, midpoint, k, n_t, t_I, N, S0, I0,
+            run_deterministic=False, **kwargs
+            ):
         r"""
         Args:
           rt_0 (float): Rt value before midpoint
@@ -15,6 +18,7 @@ class simulate_data():
           t_I (float):
           N (int): Population
           I0 (int): Intitial number of infectors
+          run_deterministic (bool): Flag to simulate deterministically
         """
         self.rt_0 = rt_0
         self.rt_1 = rt_1
@@ -29,8 +33,13 @@ class simulate_data():
 
         self.rt = self.sigmoid(rt_0, rt_1, midpoint, k, n_t)
 
-        self.S, self.I, self.R, self.i, self.i_true = self.generate_sir_stoch(
-            self.rt, t_I, N, S0, I0, n_t, **kwargs)
+        if run_deterministic:
+            self.S, self.I, self.R, self.i = self.gen_sir_det(
+                self.rt, t_I, N, S0, I0, n_t)
+            self.i_true = self.i
+        else:
+            self.S, self.I, self.R, self.i, self.i_true = self.gen_sir_stoch(
+                self.rt, t_I, N, S0, I0, n_t, **kwargs)
 
     def sigmoid(self, rt_0, rt_1, midpoint, k, n_t):
         """Computes sigmoid curve"""
@@ -41,8 +50,31 @@ class simulate_data():
     def construct_beta(self, rt, t_I):
         return rt / t_I
 
-    def generate_sir_stoch(self, rt, t_I, N, S0, I0, n_t,
-                           add_noise=False, noise_param=1/25):
+    def gen_sir_det(self, rt, t_I, N, S0, I0, n_t):
+        beta = self.construct_beta(rt, t_I)
+        S = np.array([S0])
+        Ir = np.array([I0])
+        R = np.array([0])
+        i = np.array([0])
+        for t in range(n_t):
+            dSI = beta[t]*Ir[t]*S[t]/N
+            dIR = Ir[t]/t_I
+
+            S_new = np.clip(S[t]-dSI, 0, N)
+            I_new = np.clip(Ir[t]+dSI-dIR, 0, N)
+            R_new = np.clip(R[t]+dIR, 0, N)
+
+            S = np.append(S, S_new)
+            Ir = np.append(Ir, I_new)
+            R = np.append(R, R_new)
+            i = np.append(i, dSI)
+
+        return S, Ir, R, i
+
+    def gen_sir_stoch(
+            self, rt, t_I, N, S0, I0, n_t,
+            add_noise=False, noise_param=1/25
+            ):
         beta = self.construct_beta(rt, t_I)
         S = np.array([S0])
         Ir = np.array([I0])
