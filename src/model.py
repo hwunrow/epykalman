@@ -108,11 +108,12 @@ class SIR_model():
 
                 S_t = pt.clip(S_t, 0., N)
                 I_t = pt.clip(I_t, 0., N)
-
-                obs_error_var = pm.math.maximum(1., dSI**2 * 0.2)
-                obs_error_sample = np.random.normal(0, 1)
-                dSI += obs_error_sample * np.sqrt(obs_error_var)
-                dSI = pt.clip(dSI, 0., N)
+                
+                if not self.data.run_deterministic:
+                    obs_error_var = pm.math.maximum(1., dSI**2 * 0.2)
+                    obs_error_sample = np.random.normal(0, 1)
+                    dSI += obs_error_sample * np.sqrt(obs_error_var)
+                    dSI = pt.clip(dSI, 0., N)
 
                 return S_t, I_t, dSI
 
@@ -149,7 +150,8 @@ class SIR_model():
                     "i_est",
                     mu=i,
                     # sigma=pt.abs(1+likelihood['sigma']*i),
-                    sigma=pt.abs(1+sigma*i),
+                    # sigma=pt.abs(1+sigma*i),
+                    sigma=np.abs(0.1+sigma*self.i),
                     observed=self.i
                 )
             elif likelihood['dist'] == 'negbin':
@@ -175,7 +177,7 @@ class SIR_model():
             else:
                 raise Exception("Method must be either 'metropolis' or 'NUTS'")
             trace = pm.sample(
-                n_samples, tune=n_tune, chains=4, cores=8, step=step)
+                n_samples, tune=n_tune, chains=4, cores=4, step=step)
 
         with model:
             pm.compute_log_likelihood(trace)
@@ -194,7 +196,7 @@ class SIR_model():
         if self.method == "metropolis":
             acc_rate = self.trace.sample_stats['accepted'].sum(axis=1).data / \
                 self.n_samples
-            acc_rate = pd.DataFrame(acc_rate, columns=vars)
+            acc_rate = pd.DataFrame(acc_rate)
         elif self.method == "NUTS":
             acc_rate = self.trace.sample_stats['accepted'].sum(dim="draw").\
                 data / self.n_samples
@@ -425,8 +427,8 @@ class SIR_model():
         fig, ax = plt.subplots()
         t = range(self.n_t)
 
-        ax.plot(t, self.data.i_true, '.', label="truth", color='black')
-        ax.plot(t, self.data.i, 'x', label="obs", color='blue')
+        ax.plot(t, self.data.i_true[1:], '.', label="truth", color='black')
+        ax.plot(t, self.i, 'x', label="obs", color='blue')
 
         az.plot_hdi(
             x=t,
@@ -448,6 +450,17 @@ class SIR_model():
         )
         ax.legend(loc="upper left")
         ax.set(title="Posterior Predictive HDI SIR Model")
+
+        ci_95 = az.hdi(
+            self.posterior_predictive.posterior_predictive,
+            var_names=["i_est"], hdi_prob=0.95).i_est.values
+        ci_50 = az.hdi(
+            self.posterior_predictive.posterior_predictive,
+            var_names=["i_est"], hdi_prob=0.50).i_est.values
+        prop_95 = np.mean((ci_95[:, 0] <= self.i) & (self.i <= ci_95[:, 1]))
+        prop_50 = np.mean((ci_50[:, 0] <= self.i) & (self.i <= ci_50[:, 1]))
+        logging.info(f"Percent of observations in 95% CI {prop_95}")
+        logging.info(f"Percent of observations in 50% CI {prop_50}")
 
         return (fig)
 
