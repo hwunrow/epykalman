@@ -103,16 +103,16 @@ class SIR_model():
                 dIR = (I_t / t_I) * dt
                 # dSI = pm.Poisson("dSI", (b * I_t * S_t / N) * dt)
                 # dIR = pm.Poisson("dIR", (I_t / t_I) * dt)
+                S_t = S_t - dSI
+                I_t = I_t + dSI - dIR
+
+                S_t = pt.clip(S_t, 0., N)
+                I_t = pt.clip(I_t, 0., N)
 
                 obs_error_var = pm.math.maximum(1., dSI**2 * 0.2)
                 obs_error_sample = np.random.normal(0, 1)
                 dSI += obs_error_sample * np.sqrt(obs_error_var)
-                # dSI = pt.clip(dSI, 0., N)
-
-                S_t = S_t - dSI
-                I_t = I_t + dSI - dIR
-                S_t = pt.clip(S_t, 0., N)
-                I_t = pt.clip(I_t, 0., N)
+                dSI = pt.clip(dSI, 0., N)
 
                 return S_t, I_t, dSI
 
@@ -175,7 +175,7 @@ class SIR_model():
             else:
                 raise Exception("Method must be either 'metropolis' or 'NUTS'")
             trace = pm.sample(
-                n_samples, tune=n_tune, chains=4, cores=4, step=step)
+                n_samples, tune=n_tune, chains=4, cores=8, step=step)
 
         with model:
             pm.compute_log_likelihood(trace)
@@ -368,7 +368,8 @@ class SIR_model():
                 ax=ax[1, 0],
             )
 
-        ax[0, 0].plot(self.data.i, '.', label="obs", color='black')
+        ax[0,0].plot(self.data.i_true, '.', label="truth", color='black')
+        ax[0,0].plot(self.data.i, 'x', label="obs", color='blue')
         ax[0, 0].set_xlabel('day')
         ax[0, 0].set_ylabel('Daily case counts')
         ax[0, 0].legend()
@@ -423,7 +424,9 @@ class SIR_model():
         fig, ax = plt.subplots()
         t = range(self.n_t)
 
-        ax.plot(t, self.data.i[1:], '.', color="black", label="obs")
+        ax.plot(t, self.data.i_true, '.', label="truth", color='black')
+        ax.plot(t, self.data.i, 'x', label="obs", color='blue')
+
 
         az.plot_hdi(
             x=t,
