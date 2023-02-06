@@ -25,6 +25,7 @@ class simulate_data():
         self.midpoint = midpoint
         self.k = k
         self.n_t = n_t
+        self.run_deterministic = run_deterministic
 
         self.t_I = t_I
         self.N = N
