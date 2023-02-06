@@ -213,7 +213,7 @@ class SIR_model():
         logging.info(f'trace summary:\n {summary_df}')
         logging.info(f'acceptance_rate:\n {acc_rate}')
 
-        return(summary_df, acc_rate)
+        return (summary_df, acc_rate)
 
     def plot_likelihood(self):
         fig, ax = plt.subplots()
@@ -222,13 +222,14 @@ class SIR_model():
                 self.trace.log_likelihood.sel(chain=x).mean(
                     "draw").to_array().values.ravel(), label=f"chain {x+1}")
             ax.legend()
-        return(fig)
+        return fig
 
     def plot_trace(self, vars):
         lines = [(var, {}, getattr(self.data, var)) for var in vars]
+        plot_vars = vars+['sigma']
         trace_plot = az.plot_trace(
-            self.trace, var_names=vars+['sigma'], lines=lines, figsize=(18, 20))
-        return(trace_plot)
+            self.trace, var_names=plot_vars, lines=lines, figsize=(18, 20))
+        return trace_plot
 
     def plot_posterior(self, vars):
         ref_val = {var: [{"ref_val": getattr(self.data, var)}] for var in vars}
@@ -239,13 +240,13 @@ class SIR_model():
             ref_val_color='red',
             figsize=(20, 5),
             )
-        return(post_plot)
+        return post_plot
 
     def plot_prior_posterior(self, vars):
         self.trace.extend(self.prior)
         prior_post_plot = az.plot_dist_comparison(
             self.trace, var_names=vars)
-        return(prior_post_plot)
+        return prior_post_plot
 
     def plot_cov_corr(self, vars, ax=None):
         fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 4))
@@ -265,13 +266,13 @@ class SIR_model():
             corr, annot=True, xticklabels=vars,
             yticklabels=vars, ax=axs[1])
 
-        return(fig)
+        return fig
 
     def plot_parallel_coord(self, vars):
         if self.method == self.method == "NUTS":
             par_plot = az.plot_parallel(
                 self.trace, var_names=vars, norm_method="normal")
-            return(par_plot.figure)
+            return par_plot.figure
 
         _posterior = self.trace.posterior[vars].stack(
             chain_draw=['chain', 'draw']).to_array().data
@@ -294,7 +295,7 @@ class SIR_model():
         axs[1].set_xticks(range(len(vars)))
         axs[1].set_xticklabels(vars)
 
-        return(fig)
+        return fig
 
     def plot_sir(self, plot_chain=False):
         fig, ax = plt.subplots(2, 2, sharex=True, figsize=(15, 15))
@@ -368,8 +369,8 @@ class SIR_model():
                 ax=ax[1, 0],
             )
 
-        ax[0,0].plot(self.data.i_true, '.', label="truth", color='black')
-        ax[0,0].plot(self.data.i, 'x', label="obs", color='blue')
+        ax[0, 0].plot(self.data.i_true, '.', label="truth", color='black')
+        ax[0, 0].plot(self.data.i, 'x', label="obs", color='blue')
         ax[0, 0].set_xlabel('day')
         ax[0, 0].set_ylabel('Daily case counts')
         ax[0, 0].legend()
@@ -386,7 +387,7 @@ class SIR_model():
 
         fig.delaxes(ax[1, 1])
 
-        return(fig)
+        return fig
 
     def plot_rt(self):
         prop_cycle = plt.rcParams['axes.prop_cycle']
@@ -418,15 +419,14 @@ class SIR_model():
         ax[1].set_ylabel('Rt')
         ax[1].legend()
 
-        return(fig)
-   
+        return fig
+
     def plot_ppc(self):
         fig, ax = plt.subplots()
         t = range(self.n_t)
 
         ax.plot(t, self.data.i_true, '.', label="truth", color='black')
         ax.plot(t, self.data.i, 'x', label="obs", color='blue')
-
 
         az.plot_hdi(
             x=t,
@@ -449,7 +449,7 @@ class SIR_model():
         ax.legend(loc="upper left")
         ax.set(title="Posterior Predictive HDI SIR Model")
 
-        return(fig)
+        return (fig)
 
     def plot_all(self, vars, path=None):
         trace_plot = self.plot_trace(vars)
