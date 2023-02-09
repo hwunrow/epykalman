@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+import inspect
+import logging
 
 
 class simulate_data():
@@ -97,6 +99,7 @@ class simulate_data():
         i_true = i
         if add_noise:
             i = i.astype('float64')
+            self.noise_param = noise_param
             obs_error_var = np.maximum(1., i[1:]**2 * noise_param)
             obs_error_sample = np.random.normal(0, 1, size=n_t)
             i[1:] += obs_error_sample * np.sqrt(obs_error_var)
@@ -147,5 +150,8 @@ class simulate_data():
             plt.savefig(f'{path}/synthetic_data.pdf')
 
     def save_data(self, path=None):
+        # log source code
+        lines = inspect.getsource(simulate_data)
+        logging.info(lines)
         with open(f'{path}/data.pkl', 'wb') as file:
             pickle.dump(self, file, pickle.HIGHEST_PROTOCOL)
