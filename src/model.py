@@ -14,6 +14,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 import pickle
 import cloudpickle
+import inspect
 
 
 class SIR_model():
@@ -99,8 +100,7 @@ class SIR_model():
             def next_day(b, S_t, I_t, _, t_I, N, dt=1):
                 dSI = (b * I_t * S_t / N) * dt
                 dIR = (I_t / t_I) * dt
-                # dSI = pm.Poisson("dSI", (b * I_t * S_t / N) * dt)
-                # dIR = pm.Poisson("dIR", (I_t / t_I) * dt)
+
                 S_t = S_t - dSI
                 I_t = I_t + dSI - dIR
 
@@ -108,7 +108,8 @@ class SIR_model():
                 I_t = pt.clip(I_t, 0., N)
 
                 if not self.data.run_deterministic:
-                    obs_error_var = pm.math.maximum(1., dSI**2 * 0.2)
+                    obs_error_var = pm.math.maximum(
+                        1., dSI**2 * self.data.noise_param)
                     obs_error_sample = np.random.normal(0, 1)
                     dSI += obs_error_sample * np.sqrt(obs_error_var)
                     dSI = pt.clip(dSI, 0., N)
@@ -137,9 +138,7 @@ class SIR_model():
                     "i_est",
                     nu=likelihood['nu'],
                     mu=i,
-                    # sigma=pt.abs(1+likelihood['sigma']*i),
                     sigma=pt.abs(1+sigma*i),
-                    # sigma=pt.abs(1+sigma*i)
                     observed=self.i
                 )
             elif likelihood['dist'] == 'normal':
@@ -147,8 +146,7 @@ class SIR_model():
                 like = pm.Normal(
                     "i_est",
                     mu=i,
-                    # sigma=pt.abs(0.1+sigma*i),
-                    sigma=np.abs(1+sigma*self.i),
+                    sigma=pt.abs(1+sigma*i),
                     observed=self.i
                 )
             elif likelihood['dist'] == 'negbin':
@@ -242,5 +240,8 @@ class SIR_model():
             pdf.savefig(fig_ppc)
 
     def save_model(self, path=None):
+        # log source code
+        lines = inspect.getsource(self.run_SIR_model)
+        logging.info(lines)
         with open(f'{path}/model.pkl', 'wb') as file:
             cloudpickle.dump(self, file, pickle.HIGHEST_PROTOCOL)
