@@ -157,79 +157,79 @@ ggplot(long_merge_dt, aes(x=time,y=value,color=variable)) + geom_line() + theme_
 
 # EpiEstim ----------------------------------------------------------------
 
-library(EpiEstim)
-simulate_seir_ode_stoch_daily_inc <- function(
-    rt, t_E, t_I,
-    N, S_init, E_init, I_init,
-    n_t
-) {
-  beta <- construct_beta(rt, t_I, n_t)
-  if(t_E > 0) {
-    # SEIR model
-    S <- c(S_init)
-    E <- c(E_init)
-    I <- c(I_init)
-    R <- N - S - E - I
-    for(t in 1:n_t) {
-      dSE <- rpois(1, beta(t)*I[t]*S[t]/N)
-      dEI <- rpois(1, E[t]/t_E)
-      dIR <- rpois(1, I[t]/t_I)
-      
-      S_new <- min(max(S[t]-dSE,0),N)
-      E_new <- min(max(E[t]+dSE-dEI,0),N)
-      I_new <- min(max(I[t]+dEI-dIR,0),N)
-      R_new <- min(max(R[t]+dIR,0),N)
-      
-      S <- c(S,S_new)
-      E <- c(E,E_new)
-      I <- c(I,I_new)
-      R <- c(R,R_new)
-    }
-    seir_dt <- data.table(time=0:n_t,S=S,E=E,I=I,R=R)
-    return(seir_dt)
-  }
-  else {
-    # SIR model
-    S <- c(S_init)
-    I <- c(I_init)
-    R <- N - S - I
-    dSI_list <- c()
-    for(t in 1:n_t) {
-      dSI <- rpois(1, beta(t)*I[t]*S[t]/N)
-      dIR <- rpois(1, I[t]/t_I)
-      dSI_list <- c(dSI_list, dSI)
-      
-      S_new <- min(max(S[t]-dSI,0),N)
-      I_new <- min(max(I[t]+dSI-dIR,0),N)
-      R_new <- min(max(R[t]+dIR,0),N)
-      
-      S <- c(S,S_new)
-      I <- c(I,I_new)
-      R <- c(R,R_new)
-    }
-    sir_dt <- data.table(time=0:n_t,S=S,I=I,R=R)
-    return(dSI_list)
-  }
-}
-
-rt <- logistic_curve(2.9, 1.7, n_t, 10, 0.5)
-
-daily_inc_counts <- simulate_seir_ode_stoch(
-  rt, t_E, t_I,
-  N, S_init, E_init, I_init,
-  n_t
-)
-
-S_prop <- long_merge_dt[variable == "S_stoch", .(value)]
-
-
-res_parametric_si <- estimate_R(daily_inc_counts, 
-                                method="parametric_si",
-                                config = make_config(list(
-                                  mean_si = 4, 
-                                  std_si = 1.5)))
-
-head(res_parametric_si$R)
-
-plot(res_parametric_si, legend = FALSE)
-plot(0:n_t,rt)
+# library(EpiEstim)
+# simulate_seir_ode_stoch_daily_inc <- function(
+#     rt, t_E, t_I,
+#     N, S_init, E_init, I_init,
+#     n_t
+# ) {
+#   beta <- construct_beta(rt, t_I, n_t)
+#   if(t_E > 0) {
+#     # SEIR model
+#     S <- c(S_init)
+#     E <- c(E_init)
+#     I <- c(I_init)
+#     R <- N - S - E - I
+#     for(t in 1:n_t) {
+#       dSE <- rpois(1, beta(t)*I[t]*S[t]/N)
+#       dEI <- rpois(1, E[t]/t_E)
+#       dIR <- rpois(1, I[t]/t_I)
+#       
+#       S_new <- min(max(S[t]-dSE,0),N)
+#       E_new <- min(max(E[t]+dSE-dEI,0),N)
+#       I_new <- min(max(I[t]+dEI-dIR,0),N)
+#       R_new <- min(max(R[t]+dIR,0),N)
+#       
+#       S <- c(S,S_new)
+#       E <- c(E,E_new)
+#       I <- c(I,I_new)
+#       R <- c(R,R_new)
+#     }
+#     seir_dt <- data.table(time=0:n_t,S=S,E=E,I=I,R=R)
+#     return(seir_dt)
+#   }
+#   else {
+#     # SIR model
+#     S <- c(S_init)
+#     I <- c(I_init)
+#     R <- N - S - I
+#     dSI_list <- c()
+#     for(t in 1:n_t) {
+#       dSI <- rpois(1, beta(t)*I[t]*S[t]/N)
+#       dIR <- rpois(1, I[t]/t_I)
+#       dSI_list <- c(dSI_list, dSI)
+#       
+#       S_new <- min(max(S[t]-dSI,0),N)
+#       I_new <- min(max(I[t]+dSI-dIR,0),N)
+#       R_new <- min(max(R[t]+dIR,0),N)
+#       
+#       S <- c(S,S_new)
+#       I <- c(I,I_new)
+#       R <- c(R,R_new)
+#     }
+#     sir_dt <- data.table(time=0:n_t,S=S,I=I,R=R)
+#     return(dSI_list)
+#   }
+# }
+# 
+# rt <- logistic_curve(2.9, 1.7, n_t, 10, 0.5)
+# 
+# daily_inc_counts <- simulate_seir_ode_stoch(
+#   rt, t_E, t_I,
+#   N, S_init, E_init, I_init,
+#   n_t
+# )
+# 
+# S_prop <- long_merge_dt[variable == "S_stoch", .(value)]
+# 
+# 
+# res_parametric_si <- estimate_R(daily_inc_counts, 
+#                                 method="parametric_si",
+#                                 config = make_config(list(
+#                                   mean_si = 4, 
+#                                   std_si = 1.5)))
+# 
+# head(res_parametric_si$R)
+# 
+# plot(res_parametric_si, legend = FALSE)
+# plot(0:n_t,rt)

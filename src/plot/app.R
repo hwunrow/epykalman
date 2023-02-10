@@ -3,7 +3,7 @@
 # Description: Various plots to 
 
 library(shiny)
-source("~/GitHub/rt-estimation/src/sir_seir_simulation.R")
+source("~/Documents/GitHub/rt-estimation/src/rcode/sir_seir_simulation.R")
 
 ui <- fluidPage(
 
@@ -27,18 +27,18 @@ ui <- fluidPage(
             h3("k"),
             min = 0,
             max = 3,
-            value = 0.5,
+            value = 0.1,
             step = 0.1
           ), 
           numericInput(
             "rt_before",
             h3("Rt before"),
-            value = 2.8
+            value = 1.4
           ),
           numericInput(
             "rt_after",
             h3("Rt after"),
-            value = 1.3
+            value = 3
           ),
           numericInput(
             "mid",
@@ -48,7 +48,7 @@ ui <- fluidPage(
           numericInput(
             "n_t",
             h3("Number of days"),
-            value = 300
+            value = 365
           ),
           numericInput(
             "t_E",
@@ -63,12 +63,12 @@ ui <- fluidPage(
           numericInput(
             "N",
             h3("N"),
-            value = 2e6
+            value = 100000
           ),
           numericInput(
             "S_init",
             h3("Initial S"),
-            value = 1999940
+            value = 99900
           ),
           numericInput(
             "E_init",
@@ -78,7 +78,7 @@ ui <- fluidPage(
           numericInput(
             "I_init",
             h3("Initial I"),
-            value = 60
+            value = 100
           ),
           downloadLink('downloadSIRData', 'Download SIR'),
           downloadLink('downloadRtData', 'Download Rt')
@@ -87,7 +87,8 @@ ui <- fluidPage(
         # Show a plot of the generated distribution
         mainPanel(
           plotlyOutput("rtPlot"),
-          plotlyOutput("simPlot")
+          plotlyOutput("simPlot"),
+          plotlyOutput("simPlot2")
         )
     )
 )
@@ -141,6 +142,13 @@ server <- function(input, output) {
       ggplotly(g)
     })
     
+    output$simPlot2 <- renderPlotly({
+      merge_dt <- sirData()
+      merge_dt <- merge_dt[, .(time, i)]
+      g <- ggplot(merge_dt, aes(x=time,y=i)) + geom_line() + theme_bw() + ggtitle("Daily Case Counts")
+      ggplotly(g)
+    })
+    
     
     output$downloadSIRData <- downloadHandler(
       filename = function() {
@@ -150,7 +158,6 @@ server <- function(input, output) {
         write.csv(sirData(), con)
       }
     )
-    
     
     
     output$downloadRtData <- downloadHandler(
