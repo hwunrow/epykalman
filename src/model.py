@@ -143,10 +143,10 @@ class SIR_model():
                 )
             elif likelihood['dist'] == 'normal':
                 sigma = pm.HalfCauchy("sigma", 10)
-                like = pm.Normal(
+                like = pm.MvNormal(
                     "i_est",
                     mu=i,
-                    sigma=pt.abs(1+sigma*i),
+                    cov=pt.diag(1+sigma*i),
                     observed=self.i
                 )
             elif likelihood['dist'] == 'negbin':
@@ -159,8 +159,16 @@ class SIR_model():
                     mu=i,
                     observed=self.i
                 )
+            elif likelihood['dist'] == 'chi-squared':
+                like = pm.ChiSquared(
+                    "i_est",
+                    nu=i,
+                    observed=self.i
+                )
             else:
-                raise Exception("Likelihood dist must be studens-t or normal")
+                raise Exception(
+                    "Likelihood dist must be students-t, normal, negbin, \
+                        or chi-squared")
 
             pm.Deterministic("likelihood", like)
 
