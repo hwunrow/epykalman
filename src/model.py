@@ -146,7 +146,7 @@ class SIR_model():
                 like = pm.MvNormal(
                     "i_est",
                     mu=i,
-                    cov=pt.diag(1+sigma*i),
+                    cov=pt.diag(1+sigma*i)**2,
                     observed=self.i
                 )
             elif likelihood['dist'] == 'negbin':
