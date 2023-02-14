@@ -143,12 +143,18 @@ class SIR_model():
                 )
             elif likelihood['dist'] == 'normal':
                 sigma = pm.HalfCauchy("sigma", 10)
-                like = pm.MvNormal(
+                like = pm.Normal(
                     "i_est",
                     mu=i,
-                    cov=pt.diag(1+sigma*i)**2,
+                    sigma=pt.abs(1+sigma*i),
                     observed=self.i
                 )
+                # like = pm.MvNormal(
+                #     "i_est",
+                #     mu=i,
+                #     cov=pt.diag(1+sigma*i)**2,
+                #     observed=self.i
+                # )
             elif likelihood['dist'] == 'negbin':
                 alpha_inv = pm.Normal(name="alpha_inv", mu=0, sigma=0.5)
                 alpha = pm.Deterministic(
