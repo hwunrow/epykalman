@@ -233,7 +233,7 @@ def plot_ppc(self):
         hdi_prob=0.95,
         color="gray",
         smooth=False,
-        fill_kwargs={"label": "HDI 50%", "alpha": 0.3},
+        fill_kwargs={"label": "HDI 95%", "alpha": 0.3},
         ax=ax,
     )
     az.plot_hdi(
@@ -242,7 +242,7 @@ def plot_ppc(self):
         hdi_prob=0.5,
         color="gray",
         smooth=False,
-        fill_kwargs={"label": "HDI 95%", "alpha": 0.5},
+        fill_kwargs={"label": "HDI 50%", "alpha": 0.5},
         ax=ax,
     )
     ax.legend(loc="upper left")
@@ -258,5 +258,7 @@ def plot_ppc(self):
     prop_50 = np.mean((ci_50[:, 0] <= self.i) & (self.i <= ci_50[:, 1]))
     logging.info(f"Percent of observations in 95% CI {prop_95}")
     logging.info(f"Percent of observations in 50% CI {prop_50}")
+    print(f"Percent of observations in 95% CI {prop_95}")
+    print(f"Percent of observations in 50% CI {prop_50}")
 
     return (fig)
