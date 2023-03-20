@@ -180,13 +180,24 @@ class SIR_model():
 
             if method == 'metropolis':
                 step = pm.Metropolis()
+            elif method == "DEmetropolis":
+                step = pm.DEMetropolis()
             elif method == 'NUTS':
                 step = pm.NUTS(adapt_step_size=True)
                 # pm.init_nuts(init='advi', n_init=500_000)
             else:
                 raise Exception("Method must be either 'metropolis' or 'NUTS'")
             trace = pm.sample(
-                n_samples, tune=n_tune, chains=4, cores=4, step=step)
+                    draws=n_samples,
+                    tune=n_tune,
+                    chains=9,
+                    step=step,
+                    # make tests faster by not parallelizing; disable convergence warning
+                    cores=1,
+                    compute_convergence_checks=False,
+                )
+            # trace = pm.sample(
+            #     n_samples, tune=n_tune, chains=4, cores=4, step=step)
 
         with model:
             pm.compute_log_likelihood(trace)
