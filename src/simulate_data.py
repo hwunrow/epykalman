@@ -87,9 +87,9 @@ class simulate_data():
             dSI = np.random.poisson(beta[t]*Ir[t]*S[t]/N)
             dIR = np.random.poisson(Ir[t]/t_I)
 
-            S_new = min(max(S[t]-dSI, 0), N)
-            I_new = min(max(Ir[t]+dSI-dIR, 0), N)
-            R_new = min(max(R[t]+dIR, 0), N)
+            S_new = np.clip(S[t]-dSI, 0, N)
+            I_new = np.clip(Ir[t]+dSI-dIR, 0, N)
+            R_new = np.clip(R[t]+dIR, 0, N)
 
             S = np.append(S, S_new)
             Ir = np.append(Ir, I_new)
@@ -103,7 +103,7 @@ class simulate_data():
             obs_error_var = np.maximum(1., i[1:]**2 * noise_param)
             obs_error_sample = np.random.normal(0, 1, size=n_t)
             i[1:] += obs_error_sample * np.sqrt(obs_error_var)
-            i = np.minimum(np.maximum(i, 0), N)
+            i = np.clip(i, 0, N)
 
         return S, Ir, R, i, i_true
 
