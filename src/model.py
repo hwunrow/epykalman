@@ -238,7 +238,7 @@ class SIR_model():
         return (summary_df, acc_rate)
 
     # import plotting functions
-    from pymc_plot import (plot_trace, plot_posterior, plot_prior_posterior,
+    from plot.pymc_plot import (plot_trace, plot_posterior, plot_prior_posterior,
                            plot_cov_corr, plot_parallel_coord, plot_sir,
                            plot_rt, plot_ppc)
 
