@@ -193,7 +193,7 @@ class SIR_model():
                     chains=9,
                     step=step,
                     # make tests faster by not parallelizing; disable convergence warning
-                    cores=1,
+                    cores=5,
                     compute_convergence_checks=False,
                 )
             # trace = pm.sample(
