@@ -51,6 +51,7 @@ class simulate_data():
         return sigmoid
 
     def construct_beta(self, rt, t_I):
+        self.beta = rt/t_I
         return rt / t_I
 
     def gen_sir_det(self, rt, t_I, N, S0, I0, n_t):
