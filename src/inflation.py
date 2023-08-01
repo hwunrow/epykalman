@@ -1,19 +1,20 @@
 import numpy as np
 
 
-def _adaptive_inflation(x, y, z, oev, lambar_prior=1.1, siglam2=0.1):
+def adaptive_inflation(x, y, z, oev, lambar_prior=1.01, siglam2=0.001):
     # step 3b
     sig2p = np.var(y)
     ybarp = np.mean(y)
     D = np.abs(ybarp - z) * z / 50
 
     # step 3c
-    r = np.cov(x, y)[0, 1]  # i
+    # r = np.cov(x, y)[0, 1]  # i
+    r = np.corrcoef(x, y)[0, 1]  # i
     lam0 = (1.0 + r * (np.sqrt(lambar_prior) - 1.0)) ** 2  # iii
     theta = np.sqrt(lam0 * sig2p + oev)  # iv
 
     # v/ Appendix A
-    lbar = 1.0 / (np.sqrt(2 * np.pi) * theta) * np.exp(-(D**2) / (2.0 * theta**2))
+    lbar = 1. / (np.sqrt(2 * np.pi) * theta) * np.exp(-(D**2) / (2 * theta**2))
     dthetadlam = (
         sig2p
         * r
@@ -34,7 +35,7 @@ def _adaptive_inflation(x, y, z, oev, lambar_prior=1.1, siglam2=0.1):
         return lam2
 
 
-def _inflate_ensembles(ens, inflation_value, params=False):
+def inflate_ensemble(ens, inflation_value, params=False):
     if params:
         _, m = np.asarray(ens).shape
         ens_mean = np.mean(ens, 1, keepdims=True)
