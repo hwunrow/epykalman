@@ -2,7 +2,6 @@ import numpy as np
 from tqdm import tqdm
 import inflation
 import matplotlib.pyplot as plt
-from scipy.stats import wasserstein_distance
 import simulate_data
 
 
@@ -349,8 +348,23 @@ class EnsembleAdjustmentKalmanFilter():
         np.sum(p_safe * np.log(p_safe / q_safe))
         return np.sum(p_safe * np.log(p_safe / q_safe))
 
-    def wasserstein(self, p_samples, q_samples):
-        assert len(p_samples) == len(q_samples)
+    def wasserstein2(self, p_sample, q_sample, num_bins=10):
+        assert len(p_sample) == len(q_sample)
+        p_bins, q_bins, bins = self.bin_data(p_sample, q_sample, num_bins)
+        p_probs = self.compute_probs(p_bins, num_bins+1)
+        q_probs = self.compute_probs(q_bins, num_bins+1)
+        assert len(p_probs) == len(q_probs)
+        assert np.isclose(np.sum(p_probs), 1.0), "Dist p must sum to 1"
+        assert np.isclose(np.sum(q_probs), 1.0), "Dist q must sum to 1"
 
-        w2 = wasserstein_distance(p_samples, q_samples)
+        # Compute the cumulative sums
+        p_cdf = np.cumsum(p_probs)
+        q_cdf = np.cumsum(q_probs)
+
+        # Calculate the squared distances between the cumulative sums
+        squared_distances = (p_cdf - q_cdf) ** 2
+
+        # Compute the W-2 metric
+        w2 = np.sqrt(np.sum(squared_distances))
+
         return w2
