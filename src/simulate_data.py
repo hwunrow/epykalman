@@ -22,6 +22,17 @@ class simulate_data():
           I0 (int): Intitial number of infectors
           run_deterministic (bool): Flag to simulate deterministically
         """
+        self.true_params = {
+                'rt_0': rt_0,
+                'rt_1': rt_1,
+                'midpoint': midpoint,
+                'k': k,
+                'n_t': n_t,
+                't_I': t_I,
+                'N': N,
+                'S0': S0,
+                'I0': I0,
+        }
         self.rt_0 = rt_0
         self.rt_1 = rt_1
         self.midpoint = midpoint
