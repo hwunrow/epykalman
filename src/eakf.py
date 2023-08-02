@@ -64,6 +64,7 @@ class EnsembleAdjustmentKalmanFilter():
 
     def filter(self, prior, inf_method="adaptive", lam_fixed=1.01):
         x_list = []
+        xhat_list = []
         θ_list = []
         lam_list = []
         alpha_list = []
@@ -74,8 +75,10 @@ class EnsembleAdjustmentKalmanFilter():
             if t == 0:
                 x = self.f0(self.data.N, m=self.m)
                 θ = self.θ0(prior, m=self.m)
+                xhat_list.append(x)
             else:
                 x = self.f(t, x, θ, self.data.N)
+                xhat_list.append(x)
                 y = self.h(x)
                 z = self.data.i[t]
                 oev = self.oev(z)
@@ -155,10 +158,11 @@ class EnsembleAdjustmentKalmanFilter():
             x_list.append(x)
             θ_list.append(θ)
 
-        self.x_list = x_list
-        self.θ_list = θ_list
-        self.lam_list = lam_list
-        self.alpha_list = alpha_list
+        self.xhat_list = np.array(xhat_list)
+        self.x_list = np.array(x_list)
+        self.θ_list = np.array(θ_list)
+        self.lam_list = np.array(lam_list)
+        self.alpha_list = np.array(alpha_list)
 
     def free_sim(self, beta):
         S = np.array([self.data.S0 * np.ones(300)])
