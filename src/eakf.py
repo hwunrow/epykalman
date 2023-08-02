@@ -2,6 +2,8 @@ import numpy as np
 from tqdm import tqdm
 import inflation
 import matplotlib.pyplot as plt
+from scipy.stats import wasserstein_distance
+import simulate_data
 
 
 class EnsembleAdjustmentKalmanFilter():
@@ -78,7 +80,7 @@ class EnsembleAdjustmentKalmanFilter():
                 y = self.h(x)
                 z = self.data.i[t]
                 oev = self.oev(z)
-                if t > 50:
+                if t > 50:  # inflate after 50 days
                     if inf_method == "adaptive":
                         lam = inflation.adaptive_inflation(
                             θ.beta, y, z, oev, lambar_prior=lam)
@@ -87,7 +89,11 @@ class EnsembleAdjustmentKalmanFilter():
                         lam_R = inflation.adaptive_inflation(x.R, y, z, oev)
                         lam_i = inflation.adaptive_inflation(x.i, y, z, oev)
                     elif inf_method == "constant":
-                        lam = lam_S = lam_I = lam_R = lam_i = lam_fixed
+                        if t < 250:
+                            lam = lam_fixed
+                            lam_S = lam_I = lam_R = lam_i = 1.01
+                        else:
+                            lam = lam_S = lam_I = lam_R = lam_i = 1.
                     else:
                         lam = lam_S = lam_I = lam_R = lam_i = 1.
                     # if z > 0:
@@ -177,6 +183,8 @@ class EnsembleAdjustmentKalmanFilter():
             Ir = np.append(Ir, [I_new], axis=0)
             R = np.append(R, [R_new], axis=0)
             i = np.append(i, [dSI], axis=0)
+
+        self.i_ppc = i
 
         return S, Ir, R, i
 
@@ -284,3 +292,65 @@ class EnsembleAdjustmentKalmanFilter():
         ax[2].set_ylabel(r"$\lambda$")
 
         fig.suptitle('EAKF full time series adaptive inflation')
+
+    def compute_data_distribution(self, num_real=300):
+        data_distribution = np.zeros(shape=self.data.i.shape)
+
+        for _ in range(num_real):
+            a = simulate_data.simulate_data(
+                **self.data.true_params, add_noise=True, noise_param=1/50)
+            data_distribution = np.vstack((data_distribution, a.i))
+
+        data_distribution = np.delete(data_distribution, (0), axis=0)
+        self.data_distribution = data_distribution.T
+
+    def plot_ppc(self):
+        fig, ax = plt.subplots()
+        ax.plot(self.data_distribution, color="gray", alpha=0.01)
+        ax.plot(self.i_ppc, color="blue", alpha=0.01)
+
+        blue_line = plt.Line2D(
+            [], [], color='blue', label='Posterior Predictive')
+        grey_line = plt.Line2D(
+            [], [], color='grey', label='Data Distribution')
+        ax.legend(handles=[blue_line, grey_line])
+
+        ax.axvspan(10, 105, color="red", alpha=0.1)
+        ax.axvspan(190, 250, color="red", alpha=0.1)
+
+        ax.set_title(
+            "Data Distribution vs EAKF Posterior Predictive Distribution")
+
+    def bin_data(self, d, d_pp, num_bins, bins=None):
+        data_min = min(np.min(d), np.min(d_pp))
+        data_max = max(np.max(d), np.max(d_pp))
+        if bins is None:
+            bins = np.linspace(data_min, data_max, num_bins + 1)
+        digitized = np.digitize(d, bins)
+        digitized_pp = np.digitize(d_pp, bins)
+
+        # Adjust bin indices to start from 0
+        return digitized - 1, digitized_pp - 1, bins
+
+    def compute_probs(self, digitized_data, num_bins):
+        counts = np.bincount(digitized_data, minlength=num_bins)
+        probs = counts / len(digitized_data)
+        return probs
+
+    def kl_divergence(self, p_sample, q_sample, epsilon=1e-10, num_bins=10):
+        p_bins, q_bins, bins = self.bin_data(p_sample, q_sample, num_bins)
+
+        p_probs = self.compute_probs(p_bins, num_bins+1)
+        q_probs = self.compute_probs(q_bins, num_bins+1)
+        assert len(p_probs) == len(q_probs)
+
+        p_safe = p_probs + epsilon
+        q_safe = q_probs + epsilon
+        np.sum(p_safe * np.log(p_safe / q_safe))
+        return np.sum(p_safe * np.log(p_safe / q_safe))
+
+    def wasserstein(self, p_samples, q_samples):
+        assert len(p_samples) == len(q_samples)
+
+        w2 = wasserstein_distance(p_samples, q_samples)
+        return w2
