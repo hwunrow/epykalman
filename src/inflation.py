@@ -14,21 +14,29 @@ def adaptive_inflation(x, y, z, oev, lambar_prior=1.01, siglam2=0.001):
     theta = np.sqrt(lam0 * sig2p + oev)  # iv
 
     # v/ Appendix A
-    lbar = 1. / (np.sqrt(2 * np.pi) * theta) * np.exp(-(D**2) / (2 * theta**2))
-    dthetadlam = (
-        sig2p
-        * r
-        * (1.0 - r + r * np.sqrt(lambar_prior))
+    lbar = np.exp(-(D**2) / (2. * theta**2)) / (np.sqrt(2. * np.pi) * theta)
+    tol = 1e-16
+    # if lbar goes to 0, can't do anything so just keep current value
+    if lbar < tol:
+        return lambar_prior
+
+    dtheta_dlam = (
+        sig2p * r * (1.0 - r + r * np.sqrt(lambar_prior))
         / (2.0 * theta * np.sqrt(lambar_prior))
     )
-    lprime = lbar * (D**2 / theta**2 - 1.0) / theta * dthetadlam
+    lprime = lbar * (D**2 / theta**2 - 1.0) / theta * dtheta_dlam
 
-    b = lbar / lprime - 2 * lambar_prior
+    # if lprime goes to 0, can't do anything so just keep current value
+    if lprime < tol:
+        return lambar_prior
+
+    b = lbar / lprime - 2. * lambar_prior
     c = lambar_prior**2 - siglam2 - lbar * lambar_prior / lprime
 
-    lam1 = np.abs((-b + np.sqrt(b**2 - 4.0 * c)) / 2)
-    lam2 = np.abs((-b - np.sqrt(b**2 - 4.0 * c)) / 2)
+    lam1 = np.abs((-b + np.sqrt(b**2 - 4. * c)) / 2.)
+    lam2 = np.abs((-b - np.sqrt(b**2 - 4. * c)) / 2.)
 
+    # pick closest root
     if np.abs(lam1 - lambar_prior) < np.abs(lam2 - lambar_prior):
         return lam1
     else:
