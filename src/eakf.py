@@ -4,6 +4,8 @@ import inflation
 import matplotlib.pyplot as plt
 import simulate_data
 
+tol = 1e-16
+
 
 class EnsembleAdjustmentKalmanFilter():
     def __init__(self, model, m):
@@ -67,9 +69,18 @@ class EnsembleAdjustmentKalmanFilter():
         xhat_list = []
         θ_list = []
         lam_list = []
+        lam_var_list = []
         alpha_list = []
 
         lam = lam_S = lam_I = lam_R = lam_i = 1.01
+        lam_var = lam_var_S = lam_var_I = lam_var_R = lam_var_i = 0.1
+
+        beta_0 = self.data.rt_0 / self.data.t_I
+        beta_1 = self.data.rt_1 / self.data.t_I
+        late_day = -1/self.data.k * np.log(
+            (beta_1 - beta_0)/(0.95*beta_1 - beta_0)-1)\
+            + self.data.midpoint
+        print(late_day)
 
         for t in tqdm(range(self.data.n_t)):
             if t == 0:
@@ -82,16 +93,25 @@ class EnsembleAdjustmentKalmanFilter():
                 y = self.h(x)
                 z = self.data.i[t]
                 oev = self.oev(z)
+
                 if t > 50:  # inflate after 50 days
                     if inf_method == "adaptive":
-                        lam = inflation.adaptive_inflation(
-                            θ.beta, y, z, oev, lambar_prior=lam)
-                        lam_S = inflation.adaptive_inflation(x.S, y, z, oev)
-                        lam_I = inflation.adaptive_inflation(x.I, y, z, oev)
-                        lam_R = inflation.adaptive_inflation(x.R, y, z, oev)
-                        lam_i = inflation.adaptive_inflation(x.i, y, z, oev)
+                        inf_damping = 0.99
+                        assert inf_damping < 1.0 and inf_damping > tol
+                        lam, lam_var = inflation.adaptive_inflation(
+                            θ.beta, y, z, oev, lam, lam_var)
+                        if t > late_day:
+                            lam = 1.
+                        lam_S, lam_var_S = inflation.adaptive_inflation(
+                            x.S, y, z, oev)
+                        lam_I, lam_var_I = inflation.adaptive_inflation(
+                            x.I, y, z, oev)
+                        lam_R, lam_var_R = inflation.adaptive_inflation(
+                            x.R, y, z, oev)
+                        lam_i, lam_var_i = inflation.adaptive_inflation(
+                            x.i, y, z, oev)
                     elif inf_method == "constant":
-                        if t < 250:
+                        if t < 230:
                             lam = lam_fixed
                             lam_S = lam_I = lam_R = lam_i = 1.01
                         else:
@@ -106,16 +126,6 @@ class EnsembleAdjustmentKalmanFilter():
                     #         lam_I = 1.
                     #         lam_R = 1.
                     #         lam_i = 1.
-                    if np.isnan(lam):
-                        lam = 1.
-                    if np.isnan(lam_S):
-                        lam_S = 1.
-                    if np.isnan(lam_I):
-                        lam_I = 1.
-                    if np.isnan(lam_R):
-                        lam_R = 1.
-                    if np.isnan(lam_i):
-                        lam_i = 1.
                     # if turn_off:
                     #     lam = 1.
                     #     lam_S = 1.
@@ -123,6 +133,7 @@ class EnsembleAdjustmentKalmanFilter():
                     #     lam_R = 1.
                     #     lam_i = 1.
                     lam_list.append(lam)
+                    lam_var_list.append(lam_var)
                     θ = inflation.inflate_ensemble(
                         θ, inflation_value=lam, params=True)
                     θ = np.clip(θ, 0, 10)
@@ -158,10 +169,11 @@ class EnsembleAdjustmentKalmanFilter():
             x_list.append(x)
             θ_list.append(θ)
 
-        self.xhat_list = np.array(xhat_list)
-        self.x_list = np.array(x_list)
-        self.θ_list = np.array(θ_list)
+        self.xhat_list = xhat_list
+        self.x_list = x_list
+        self.θ_list = θ_list
         self.lam_list = np.array(lam_list)
+        self.lam_var_list = np.array(lam_var_list)
         self.alpha_list = np.array(alpha_list)
 
     def free_sim(self, beta):
@@ -172,7 +184,7 @@ class EnsembleAdjustmentKalmanFilter():
 
         for t in range(self.data.beta.shape[0]):
             if t < 10:
-                dSI = np.random.poisson(self.data.rt_0/self.data.t_I * Ir[t] *
+                dSI = np.random.poisson(self.data.beta[t] * Ir[t] *
                                         S[t] / self.data.N)
             else:
                 dSI = np.random.poisson(beta[t]*Ir[t]*S[t]/self.data.N)
@@ -276,7 +288,7 @@ class EnsembleAdjustmentKalmanFilter():
         ax[2].plot(np.mean([x.R for x in self.x_list], axis=1), color='black')
         ax[2].plot(self.data.R, '.')
 
-        fig, ax = plt.subplots(3)
+        fig, ax = plt.subplots(4)
         ax[0].plot([x.i for x in self.x_list], color='gray', alpha=0.1)
         ax[0].plot(np.mean([x.i for x in self.x_list], axis=1), color='black')
         ax[0].plot(self.data.i, '.')
@@ -289,10 +301,14 @@ class EnsembleAdjustmentKalmanFilter():
         ax[1].set_xlabel('day')
         ax[1].set_ylabel(r'$\beta(t)$')
 
-        ax[2].plot(
-            np.linspace(0, 365, 364), np.append(np.ones(50), self.lam_list))
+        ax[2].plot(np.linspace(0, self.data.n_t, self.data.n_t-1),
+                   np.append(np.ones(50), self.lam_list))
         ax[2].set_xlabel("day")
         ax[2].set_ylabel(r"$\lambda$")
+
+        ax[3].plot(np.concatenate((np.zeros(50), self.lam_var_list)))
+        ax[3].set_xlabel("day")
+        ax[3].set_ylabel(r"$\sigma^2_lambda$")
 
         fig.suptitle('EAKF full time series adaptive inflation')
 
