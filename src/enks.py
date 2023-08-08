@@ -8,6 +8,7 @@ class EnsembleSquareRootSmoother:
         eakf: EnsembleAdjustmentKalmanFilter
         """
         self.eakf = eakf
+        self.data = eakf.data
 
     def ensrf(x, y, z, oev, uhh=True, H=np.array([0, 0, 0, 1])):
         """
@@ -42,7 +43,7 @@ class EnsembleSquareRootSmoother:
 
         return xpost
 
-    def smooth(self, num_steps, n_real, plot=False):
+    def smooth(self, window_size, plot=False):
         lag = 1
         x_list = np.array(self.eakf.x_list)
         xhat_list = np.array(self.eakf.xhat_list)
@@ -146,7 +147,7 @@ class EnsembleSquareRootSmoother:
 
             fig.suptitle(f"EnSRS window size {lag} with adaptive inflation")
 
-        for lag in np.arange(2, 10):
+        for lag in np.arange(2, window_size):
             θ_list = np.array(θ_lag_list).copy()
             x_list = np.array(x_lag_list).copy()
 
@@ -228,9 +229,10 @@ class EnsembleSquareRootSmoother:
                 ax[2].plot(x_lag_means[:, 2], color="black")
                 ax[2].plot(self.eakf.data.R, ".")
 
-            θ_lag_list = np.array(θ_lag_list)
+            self.θ_lag_list = θ_lag_list
 
             if plot:
+                θ_lag_list = np.array(θ_lag_list)
                 fig, ax = plt.subplots(2)
 
                 ax[0].plot(x_lag_list[:, 3, :], color="gray", alpha=0.1)
@@ -245,3 +247,30 @@ class EnsembleSquareRootSmoother:
                 ax[1].set_ylabel(r"$\beta(t)$")
 
                 fig.suptitle(f"EnSRS window size {lag}")
+
+    def free_sim(self, beta):
+        S = np.array([self.data.S0 * np.ones(self.eakf.m)])
+        Ir = np.array([self.data.I0 * np.ones(self.eakf.m)])
+        R = np.array([np.zeros(self.eakf.m)])
+        i = np.array([np.zeros(self.eakf.m)])
+
+        for t in range(len(self.θ_lag_list)):
+            if t < 10:
+                dSI = np.random.poisson(self.data.beta[t] * Ir[t] *
+                                        S[t] / self.data.N)
+            else:
+                dSI = np.random.poisson(beta[t]*Ir[t]*S[t]/self.data.N)
+            dIR = np.random.poisson(Ir[t]/self.data.t_I)
+
+            S_new = np.clip(S[t]-dSI, 0, self.data.N)
+            I_new = np.clip(Ir[t]+dSI-dIR, 0, self.data.N)
+            R_new = np.clip(R[t]+dIR, 0, self.data.N)
+
+            S = np.append(S, [S_new], axis=0)
+            Ir = np.append(Ir, [I_new], axis=0)
+            R = np.append(R, [R_new], axis=0)
+            i = np.append(i, [dSI], axis=0)
+
+        self.i_ppc = i
+
+        return S, Ir, R, i
