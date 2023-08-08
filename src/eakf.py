@@ -1,8 +1,6 @@
 import numpy as np
-from tqdm import tqdm
 import inflation
 import matplotlib.pyplot as plt
-import simulate_data
 
 tol = 1e-16
 
@@ -80,9 +78,8 @@ class EnsembleAdjustmentKalmanFilter():
         late_day = -1/self.data.k * np.log(
             (beta_1 - beta_0)/(0.95*beta_1 - beta_0)-1)\
             + self.data.midpoint
-        print(late_day)
 
-        for t in tqdm(range(self.data.n_t)):
+        for t in range(self.data.n_t):
             if t == 0:
                 x = self.f0(self.data.N, m=self.m)
                 θ = self.θ0(prior, m=self.m)
@@ -94,10 +91,8 @@ class EnsembleAdjustmentKalmanFilter():
                 z = self.data.i[t]
                 oev = self.oev(z)
 
-                if t > 50:  # inflate after 50 days
+                if t > 10:  # inflate after 10 days
                     if inf_method == "adaptive":
-                        inf_damping = 0.99
-                        assert inf_damping < 1.0 and inf_damping > tol
                         lam, lam_var = inflation.adaptive_inflation(
                             θ.beta, y, z, oev, lam, lam_var)
                         if t > late_day:
@@ -177,10 +172,10 @@ class EnsembleAdjustmentKalmanFilter():
         self.alpha_list = np.array(alpha_list)
 
     def free_sim(self, beta):
-        S = np.array([self.data.S0 * np.ones(300)])
-        Ir = np.array([self.data.I0 * np.ones(300)])
-        R = np.array([np.zeros(300)])
-        i = np.array([np.zeros(300)])
+        S = np.array([self.data.S0 * np.ones(self.m)])
+        Ir = np.array([self.data.I0 * np.ones(self.m)])
+        R = np.array([np.zeros(self.m)])
+        i = np.array([np.zeros(self.m)])
 
         for t in range(self.data.beta.shape[0]):
             if t < 10:
@@ -302,89 +297,30 @@ class EnsembleAdjustmentKalmanFilter():
         ax[1].set_ylabel(r'$\beta(t)$')
 
         ax[2].plot(np.linspace(0, self.data.n_t, self.data.n_t-1),
-                   np.append(np.ones(50), self.lam_list))
+                   np.append(np.ones(self.data.n_t - len(self.lam_list) - 1),
+                             self.lam_list))
         ax[2].set_xlabel("day")
         ax[2].set_ylabel(r"$\lambda$")
 
-        ax[3].plot(np.concatenate((np.zeros(50), self.lam_var_list)))
+        ax[3].plot(np.concatenate(
+            (np.zeros(self.data.n_t - len(self.lam_var_list)-1),
+             self.lam_var_list)))
         ax[3].set_xlabel("day")
-        ax[3].set_ylabel(r"$\sigma^2_lambda$")
+        ax[3].set_ylabel(r"$\sigma^2_{\lambda}$")
 
         fig.suptitle('EAKF full time series adaptive inflation')
 
-    def compute_data_distribution(self, num_real=300):
-        data_distribution = np.zeros(shape=self.data.i.shape)
-
-        for _ in range(num_real):
-            a = simulate_data.simulate_data(
-                **self.data.true_params, add_noise=True, noise_param=1/50)
-            data_distribution = np.vstack((data_distribution, a.i))
-
-        data_distribution = np.delete(data_distribution, (0), axis=0)
-        self.data_distribution = data_distribution.T
-
     def plot_ppc(self):
-        fig, ax = plt.subplots()
-        ax.plot(self.data_distribution, color="gray", alpha=0.01)
-        ax.plot(self.i_ppc, color="blue", alpha=0.01)
+        fig, ax = plt.subplots(3)
+        ax[0].plot(self.data.data_distribution, color="gray", alpha=0.01)
+        ax[0].plot(self.i_ppc, color="blue", alpha=0.01)
 
         blue_line = plt.Line2D(
             [], [], color='blue', label='Posterior Predictive')
         grey_line = plt.Line2D(
             [], [], color='grey', label='Data Distribution')
-        ax.legend(handles=[blue_line, grey_line])
-
-        ax.axvspan(10, 105, color="red", alpha=0.1)
-        ax.axvspan(190, 250, color="red", alpha=0.1)
-
-        ax.set_title(
+        ax[0].legend(handles=[blue_line, grey_line])
+        ax[0].set_title(
             "Data Distribution vs EAKF Posterior Predictive Distribution")
-
-    def bin_data(self, d, d_pp, num_bins, bins=None):
-        data_min = min(np.min(d), np.min(d_pp))
-        data_max = max(np.max(d), np.max(d_pp))
-        if bins is None:
-            bins = np.linspace(data_min, data_max, num_bins + 1)
-        digitized = np.digitize(d, bins)
-        digitized_pp = np.digitize(d_pp, bins)
-
-        # Adjust bin indices to start from 0
-        return digitized - 1, digitized_pp - 1, bins
-
-    def compute_probs(self, digitized_data, num_bins):
-        counts = np.bincount(digitized_data, minlength=num_bins)
-        probs = counts / len(digitized_data)
-        return probs
-
-    def kl_divergence(self, p_sample, q_sample, epsilon=1e-10, num_bins=10):
-        p_bins, q_bins, bins = self.bin_data(p_sample, q_sample, num_bins)
-
-        p_probs = self.compute_probs(p_bins, num_bins+1)
-        q_probs = self.compute_probs(q_bins, num_bins+1)
-        assert len(p_probs) == len(q_probs)
-
-        p_safe = p_probs + epsilon
-        q_safe = q_probs + epsilon
-        np.sum(p_safe * np.log(p_safe / q_safe))
-        return np.sum(p_safe * np.log(p_safe / q_safe))
-
-    def wasserstein2(self, p_sample, q_sample, num_bins=10):
-        assert len(p_sample) == len(q_sample)
-        p_bins, q_bins, bins = self.bin_data(p_sample, q_sample, num_bins)
-        p_probs = self.compute_probs(p_bins, num_bins+1)
-        q_probs = self.compute_probs(q_bins, num_bins+1)
-        assert len(p_probs) == len(q_probs)
-        assert np.isclose(np.sum(p_probs), 1.0), "Dist p must sum to 1"
-        assert np.isclose(np.sum(q_probs), 1.0), "Dist q must sum to 1"
-
-        # Compute the cumulative sums
-        p_cdf = np.cumsum(p_probs)
-        q_cdf = np.cumsum(q_probs)
-
-        # Calculate the squared distances between the cumulative sums
-        squared_distances = (p_cdf - q_cdf) ** 2
-
-        # Compute the W-2 metric
-        w2 = np.sqrt(np.sum(squared_distances))
-
-        return w2
+        ax[1].plot(self.data.data_distribution, color="gray", alpha=0.01)
+        ax[2].plot(self.i_ppc, color="blue", alpha=0.01)
