@@ -119,6 +119,17 @@ class simulate_data():
 
         return S, Ir, R, i, i_true
 
+    def compute_data_distribution(self, num_real=300):
+        data_distribution = np.zeros(shape=self.i.shape)
+
+        for _ in range(num_real):
+            a = simulate_data(
+                **self.true_params, add_noise=True, noise_param=1/50)
+            data_distribution = np.vstack((data_distribution, a.i))
+
+        data_distribution = np.delete(data_distribution, (0), axis=0)
+        self.data_distribution = data_distribution.T
+
     def plot_rt(self, ax=None):
         if not ax:
             fig, ax = plt.subplots()
