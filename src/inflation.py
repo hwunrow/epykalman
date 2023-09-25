@@ -4,7 +4,7 @@ tol = 1e-16
 ratio_tol = 0.99
 
 
-def adaptive_inflation(x, y, z, oev, lambar_prior=1.01, siglam2=0.001):
+def adaptive_inflation(x, y, z, oev, lambar_prior=1.01, siglam2=0.0001):
     sig2p = np.var(y)
     # if degenerate forecast distribution, do nothing
     if sig2p < tol:
@@ -40,6 +40,7 @@ def compute_new_density(x, y, z, oev, lambar_prior, siglam2, lam):
     sig2p = np.var(y)
     ybarp = np.mean(y)
     D = np.abs(ybarp - z) * z / 50
+    # D = np.abs(ybarp - z)
     r = np.corrcoef(x, y)[0, 1]  # i
     lam0 = (1.0 + r * (np.sqrt(lambar_prior) - 1.0)) ** 2  # iii
     theta = np.sqrt(lam0 * sig2p + oev)  # iv
