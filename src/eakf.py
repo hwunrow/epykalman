@@ -63,6 +63,7 @@ class EnsembleAdjustmentKalmanFilter():
         return xpost, ypost, alpha
 
     def filter(self, prior, inf_method="adaptive", lam_fixed=1.01):
+        self.inf_method = inf_method
         x_list = []
         xhat_list = []
         θ_list = []
@@ -73,11 +74,18 @@ class EnsembleAdjustmentKalmanFilter():
         lam = lam_S = lam_I = lam_R = lam_i = 1.01
         lam_var = lam_var_S = lam_var_I = lam_var_R = lam_var_i = 0.1
 
-        beta_0 = self.data.rt_0 / self.data.t_I
-        beta_1 = self.data.rt_1 / self.data.t_I
-        late_day = -1/self.data.k * np.log(
-            (beta_1 - beta_0)/(0.95*beta_1 - beta_0)-1)\
-            + self.data.midpoint
+        try:
+            beta_0 = self.data.rt_0 / self.data.t_I
+            beta_1 = self.data.rt_1 / self.data.t_I
+            late_day = -1/self.data.k * np.log(
+                (beta_1 - beta_0)/(0.95*beta_1 - beta_0)-1)\
+                + self.data.midpoint
+        except:
+            beta_0 = self.data.rt_m[1] / self.data.t_I
+            beta_1 = self.data.rt_m[2] / self.data.t_I
+            late_day = -1/self.data.k[1] * np.log(
+                (beta_1 - beta_0)/(0.95*beta_1 - beta_0)-1)\
+                + self.data.midpoint[1]
 
         for t in range(self.data.n_t):
             if t == 0:
@@ -95,8 +103,13 @@ class EnsembleAdjustmentKalmanFilter():
                     if inf_method == "adaptive":
                         lam, lam_var = inflation.adaptive_inflation(
                             θ.beta, y, z, oev, lam, lam_var)
-                        if t > late_day:
-                            lam = 1.
+                        # if t > 100:
+                        lam = 0.98 * (lam - 1) + 1
+                        if t > late_day + 7:
+                            lam = 1.005
+                        # lam_max = 1.15
+                        # if lam > lam_max:
+                        # #     lam = lam_max
                         lam_S, lam_var_S = inflation.adaptive_inflation(
                             x.S, y, z, oev)
                         lam_I, lam_var_I = inflation.adaptive_inflation(
@@ -106,7 +119,7 @@ class EnsembleAdjustmentKalmanFilter():
                         lam_i, lam_var_i = inflation.adaptive_inflation(
                             x.i, y, z, oev)
                     elif inf_method == "constant":
-                        if t < 230:
+                        if t < late_day:
                             lam = lam_fixed
                             lam_S = lam_I = lam_R = lam_i = 1.01
                         else:
@@ -212,9 +225,9 @@ class EnsembleAdjustmentKalmanFilter():
 
         fig, ax = plt.subplots(1)
 
-        ax.fill_between(np.arange(0, 366), ci[0], ci[1], facecolor='gray',
-                        alpha=0.5, label='95% CI')
-        ax.fill_between(np.arange(0, 366), ci_50[0], ci_50[1],
+        ax.fill_between(np.arange(0, self.data.n_t+1), ci[0], ci[1],
+                        facecolor='gray', alpha=0.5, label='95% CI')
+        ax.fill_between(np.arange(0, self.data.n_t+1), ci_50[0], ci_50[1],
                         facecolor='gray', alpha=0.75, label='50% CI')
         ax.plot(self.data.i_true, 'x', color='black', label="truth")
         ax.legend(loc='upper left')
