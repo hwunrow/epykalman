@@ -32,9 +32,8 @@ class simulate_multi_data():
                 'S0': S0,
                 'I0': I0,
         }
-        print(rt_m)
         assert len(rt_m)-1 == len(midpoint) == len(k)
-        self.rt = rt_m
+        self.rt_m = rt_m
         self.midpoint = midpoint
         self.k = k
         self.n_t = n_t
@@ -132,6 +131,17 @@ class simulate_multi_data():
             i = np.clip(i, 0, N)
 
         return S, Ir, R, i, i_true
+
+    def compute_data_distribution(self, num_real=300):
+        data_distribution = np.zeros(shape=self.i.shape)
+
+        for _ in range(num_real):
+            a = simulate_multi_data(
+                **self.true_params, add_noise=True, noise_param=1/50)
+            data_distribution = np.vstack((data_distribution, a.i))
+
+        data_distribution = np.delete(data_distribution, (0), axis=0)
+        self.data_distribution = data_distribution.T
 
     def plot_rt(self, ax=None):
         if not ax:
