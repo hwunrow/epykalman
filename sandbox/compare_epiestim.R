@@ -6,6 +6,7 @@ gamma <- 1/4
 setwd("/Users/hwunrow/Documents/GitHub/rt-estimation/sandbox/")
 dt <- fread("data_test.csv")
 rt <- fread("rt.csv")$V1
+susc_dt <- fread("susc.csv")
 
 eakf_dt <- fread("eakf_rt.csv")
 eakf_dt$post_mean <- rowMeans(eakf_dt)
@@ -40,9 +41,16 @@ r_dt$post_mean <- subset_dt$post_mean
 r_dt$lower<- subset_dt$lower
 r_dt$upper<- subset_dt$upper
 
+r_dt$sucs <- susc_dt[min(r_dt$t_start):max(r_dt$t_start)]$susceptible
+
+r_dt$epiestim_mean <- r_dt$`Mean(R)` / r_dt$sucs
+r_dt$epiestim_lower <- r_dt$`Quantile.0.025(R)` / r_dt$sucs
+r_dt$epiestim_upper <- r_dt$`Quantile.0.975(R)` / r_dt$sucs
+
+
 g1 <- ggplot(r_dt) + 
-  geom_line(aes(x=t_start, y=`Mean(R)`)) + 
-  geom_ribbon(aes(x=t_start, ymin=`Quantile.0.025(R)`, ymax=`Quantile.0.975(R)`), alpha=0.5) +
+  geom_line(aes(x=t_start, y=epiestim_mean)) + 
+  geom_ribbon(aes(x=t_start, ymin=epiestim_lower, ymax=epiestim_upper), alpha=0.5) +
   geom_line(aes(x=t_start, y=post_mean, color="blue")) +
   geom_ribbon(aes(x=t_start, ymin=lower, ymax=upper), fill="blue", alpha=0.5) +
   geom_line(aes(x=t_start, y=true, color="red")) + 
@@ -70,9 +78,15 @@ for (window in 2:20) {
   r_dt$lower<- subset_dt$lower
   r_dt$upper<- subset_dt$upper
   
+  r_dt$sucs <- susc_dt[min(r_dt$t_start):max(r_dt$t_start)]$susceptible
+  
+  r_dt$epiestim_mean <- r_dt$`Mean(R)` / r_dt$sucs
+  r_dt$epiestim_lower <- r_dt$`Quantile.0.025(R)` / r_dt$sucs
+  r_dt$epiestim_upper <- r_dt$`Quantile.0.975(R)` / r_dt$sucs
+  
   g2 <- ggplot(r_dt) + 
-    geom_line(aes(x=t_start, y=`Mean(R)`)) + 
-    geom_ribbon(aes(x=t_start, ymin=`Quantile.0.025(R)`, ymax=`Quantile.0.975(R)`), alpha=0.5) +
+    geom_line(aes(x=t_start, y=epiestim_mean)) + 
+    geom_ribbon(aes(x=t_start, ymin=epiestim_lower, ymax=epiestim_upper), alpha=0.5) +
     geom_line(aes(x=t_start, y=post_mean, color="blue")) +
     geom_ribbon(aes(x=t_start, ymin=lower, ymax=upper), fill="blue", alpha=0.5) +
     geom_line(aes(x=t_start, y=true, color="red")) + 
@@ -96,8 +110,15 @@ res <- estimate_R(dt$incidence[0:190], method="parametric_si",
                   config=make_config(list(t_start = t_start, t_end = t_end, mean_si = 1/gamma, std_si = 1/gamma^2)))
 r_dt <- res$R
 r_dt$true <- rt[min(r_dt$t_start):midpoint]
-g3 <- ggplot(r_dt) + geom_line(aes(x=t_start, y=`Mean(R)`)) + 
-  geom_ribbon(aes(x=t_start, ymin=`Quantile.0.025(R)`, ymax=`Quantile.0.975(R)`, alpha=0.1)) + 
+
+r_dt$sucs <- susc_dt[min(r_dt$t_start):midpoint]$susceptible
+
+r_dt$epiestim_mean <- r_dt$`Mean(R)` / r_dt$sucs
+r_dt$epiestim_lower <- r_dt$`Quantile.0.025(R)` / r_dt$sucs
+r_dt$epiestim_upper <- r_dt$`Quantile.0.975(R)` / r_dt$sucs
+
+g3 <- ggplot(r_dt) + geom_line(aes(x=t_start, y=epiestim_mean)) + 
+  geom_ribbon(aes(x=t_start, ymin=epiestim_lower, ymax=epiestim_upper, alpha=0.1)) + 
   geom_line(aes(x=t_start, y=true, color="red")) + 
   scale_color_manual(values = c("red"), labels = c("truth")) + 
   theme_bw() + labs(title = "EpiEstim Daily Window - First Epidemic Curve") + 
@@ -112,15 +133,21 @@ res <- estimate_R(dt$incidence, method="parametric_si",
                   config=make_config(list(t_start = t_start, t_end = t_end, mean_si = 1/gamma, std_si = 1/gamma^2)))
 r_dt <- res$R
 r_dt$true <- rt[midpoint:max(r_dt$t_start)]
-g4 <- ggplot(r_dt) + geom_line(aes(x=t_start, y=`Mean(R)`)) + 
-  geom_ribbon(aes(x=t_start, ymin=`Quantile.0.025(R)`, ymax=`Quantile.0.975(R)`, alpha=0.1)) + 
+
+r_dt$sucs <- susc_dt[midpoint:max(r_dt$t_start)]$susceptible
+
+r_dt$epiestim_mean <- r_dt$`Mean(R)` / r_dt$sucs
+r_dt$epiestim_lower <- r_dt$`Quantile.0.025(R)` / r_dt$sucs
+r_dt$epiestim_upper <- r_dt$`Quantile.0.975(R)` / r_dt$sucs
+g4 <- ggplot(r_dt) + geom_line(aes(x=t_start, y=epiestim_mean)) + 
+  geom_ribbon(aes(x=t_start, ymin=epiestim_lower, ymax=epiestim_upper, alpha=0.1)) + 
   geom_line(aes(x=t_start, y=true, color="red")) + 
   scale_color_manual(values = c("red"), labels = c("truth")) + 
   theme_bw() + labs(title = "EpiEstim Daily Window - Second Epidemic Curve") + 
   xlab("day") + ylab("R_t")
 
 
-pdf("compare_epiEstim_detSIR.pdf", width = 8, height = 6)
+pdf("compare_epiEstim_detSIR_fixed.pdf", width = 8, height = 6)
 print(g0)
 print(g1)
 for (g in plot_list) {
