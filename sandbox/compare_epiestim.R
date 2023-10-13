@@ -21,7 +21,7 @@ eakf_dt$day <- 1:nrow(eakf_dt)
 
 dt$day <- 1:nrow(dt)
 g0 <- ggplot(dt) + geom_point(aes(x=day, y=dt$incidence)) + theme_bw() + 
-  labs(title="Deterministic  Synthetic Data") + xlab("day") + ylab("daily incidence")
+  labs(title="Stochastic  Synthetic Data") + xlab("day") + ylab("daily incidence")
 
 
 # daily window entire time series -----------------------------------------
@@ -147,7 +147,7 @@ g4 <- ggplot(r_dt) + geom_line(aes(x=t_start, y=epiestim_mean)) +
   xlab("day") + ylab("R_t")
 
 
-pdf("compare_epiEstim_detSIR_fixed.pdf", width = 8, height = 6)
+pdf("compare_epiEstim_stochSIR_fixed.pdf", width = 8, height = 6)
 print(g0)
 print(g1)
 for (g in plot_list) {
