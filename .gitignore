@@ -47,4 +47,3 @@ vignettes/*.pdf
 .Renviron
 
 # csvs
-*.csv
