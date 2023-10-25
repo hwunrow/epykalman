@@ -162,7 +162,7 @@ class simulate_data():
         ax.hlines(0, 0, 365, color='red')
         ax.vlines(100, -160, 100, color='red')
 
-    def plot_all(self, path=None):
+    def plot_all(self, path=None, name='synthetic_plots'):
         fig, axs = plt.subplots(2, 2, sharex=True, figsize=(10, 10))
         self.plot_rt(axs[0, 0])
         self.plot_SIR(axs[0, 1])
@@ -170,11 +170,11 @@ class simulate_data():
         fig.delaxes(axs[1, 1])
 
         if path:
-            plt.savefig(f'{path}/synthetic_data.pdf')
+            plt.savefig(f'{path}/{name}.pdf')
 
-    def save_data(self, path=None):
+    def save_data(self, path=None, name='synthetic_data'):
         # log source code
         lines = inspect.getsource(simulate_data)
         logging.info(lines)
-        with open(f'{path}/data.pkl', 'wb') as file:
+        with open(f'{path}/{name}.pkl', 'wb') as file:
             pickle.dump(self, file, pickle.HIGHEST_PROTOCOL)
