@@ -22,6 +22,20 @@ class simulate_data():
           I0 (int): Intitial number of infectors
           run_deterministic (bool): Flag to simulate deterministically
         """
+
+        if isinstance(midpoint, float):
+            logging.info("Casting midpoint to int")
+            midpoint = int(midpoint)
+        if isinstance(n_t, float):
+            logging.info("Casting n_t to int")
+            n_t = int(n_t)
+        if isinstance(N, float):
+            logging.info("Casting N to int")
+            N = int(N)
+        if isinstance(I0, float):
+            logging.info("Casting I0 to int")
+            I0 = int(I0)
+        
         self.true_params = {
                 'rt_0': rt_0,
                 'rt_1': rt_1,
