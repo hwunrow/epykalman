@@ -9,7 +9,10 @@ from numpy.random import uniform
 
 
 if __name__ == '__main__':
-    sge_task_id = int(os.environ.get("SGE_TASK_ID"))
+    try:
+        sge_task_id = int(os.environ.get("SGE_TASK_ID"))
+    except:
+        sge_task_id = 1
 
     parser = argparse.ArgumentParser(
         description="Run EAKF with adaptive, fixed, and no inflation for 1000 different synthetic data sets",
@@ -72,7 +75,8 @@ if __name__ == '__main__':
         late_day = int(late_day)
 
         det_data = simulate_data.simulate_data(**data.true_params, run_deterministic=True)
-        peak_days, = np.where(np.diff(np.sign(np.diff(det_data.i_true))) == -2)
+        peak_days, = np.where(np.diff(np.sign(np.diff(det_data.i_true))) == -2)  # days where it increases before then decreases
+        peak_days = peak_days[:2]  # just take first two days
 
         columns=["method", "rt_peak_rmse", "rt_rmse", "data_rmse","avg_w2","avg_kl","in_ci"]
         check_df = pd.DataFrame(columns=columns)
@@ -141,7 +145,6 @@ if __name__ == '__main__':
 
             ks = enks.EnsembleSquareRootSmoother(kf)
             ks.smooth(window_size=10, plot=False)
-
             ks_checks = pd.DataFrame([
                 ["smooth",
                  posterior_checks.rt_rmse(ks, peaks=peak_days),
