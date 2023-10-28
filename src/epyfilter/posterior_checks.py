@@ -149,7 +149,17 @@ def data_rmse(kf):
 def rt_rmse(kf, peaks=None):
     if peaks is not None:
         rt_kf = np.array([θ.beta * θ.t_I for θ in kf.θ_list])
-        rmse = np.sqrt(np.mean((rt_kf[peaks].T - kf.data.rt[peaks])**2, axis=0))
+        try:
+            rmse = np.sqrt(np.mean((rt_kf[peaks].T - kf.data.rt[peaks])**2, axis=0))
+            try:
+                peak = peaks[0]
+                rmse = np.sqrt(np.mean((rt_kf[peak].T - kf.data.rt[peak])**2, axis=0))
+            except ValueError as ve:
+                print(f"ValueError: {ve}. Please enter a valid number.")
+        except ValueError as ve:
+            print(f"ValueError: {ve}. Please enter a valid number.")
+            return np.inf
+
     else:
         rt_kf = np.array([θ.beta * θ.t_I for θ in kf.θ_list])
         rmse = np.sqrt(np.mean((rt_kf.T - kf.data.rt[:len(rt_kf)])**2, axis=0))
