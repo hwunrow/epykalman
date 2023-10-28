@@ -1,5 +1,5 @@
 import numpy as np
-import inflation
+from epyfilter import inflation
 import matplotlib.pyplot as plt
 
 tol = 1e-16
@@ -211,7 +211,7 @@ class EnsembleAdjustmentKalmanFilter():
 
         return S, Ir, R, i
 
-    def plot_reliability(self):
+    def plot_reliability(self, path=None, name='eakf_reliability'):
         betas = np.asarray([θ.beta for θ in self.θ_list])
         S, Ir, R, i = self.free_sim(betas)
 
@@ -281,8 +281,10 @@ class EnsembleAdjustmentKalmanFilter():
 
         # for p in percentiles:
         #     S, Ir, R, i = self.free_sim(np.quantile(betas_skip, q=p/100))
+        if path:
+            plt.savefig(f'{path}/{name}.pdf')
 
-    def plot_posterior(self):
+    def plot_posterior(self, path=None, name='eakf_posterior'):
         fig, ax = plt.subplots(3)
         ax[0].plot([x.S for x in self.x_list], color='gray', alpha=0.1)
         ax[0].plot(np.mean([x.S for x in self.x_list], axis=1), color='black')
@@ -323,7 +325,10 @@ class EnsembleAdjustmentKalmanFilter():
 
         fig.suptitle('EAKF full time series adaptive inflation')
 
-    def plot_ppc(self):
+        if path:
+            plt.savefig(f'{path}/{name}.pdf')
+
+    def plot_ppc(self, path=None, name='eakf_ppc'):
         fig, ax = plt.subplots(3)
         ax[0].plot(self.data.data_distribution, color="gray", alpha=0.01)
         ax[0].plot(self.i_ppc, color="blue", alpha=0.01)
@@ -337,3 +342,6 @@ class EnsembleAdjustmentKalmanFilter():
             "Data Distribution vs EAKF Posterior Predictive Distribution")
         ax[1].plot(self.data.data_distribution, color="gray", alpha=0.01)
         ax[2].plot(self.i_ppc, color="blue", alpha=0.01)
+
+        if path:
+            plt.savefig(f'{path}/{name}.pdf')
