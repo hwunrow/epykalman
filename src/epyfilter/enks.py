@@ -247,6 +247,9 @@ class EnsembleSquareRootSmoother:
                 ax[1].set_ylabel(r"$\beta(t)$")
 
                 fig.suptitle(f"EnSRS window size {lag}")
+        
+        self.θ_list = θ_lag_list
+        self.x_list = x_lag_list
 
     def free_sim(self, beta):
         S = np.array([self.data.S0 * np.ones(self.eakf.m)])
