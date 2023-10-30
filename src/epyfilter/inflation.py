@@ -2,7 +2,8 @@ import numpy as np
 
 tol = 1e-16
 ratio_tol = 0.99
-
+max_lam = 2.
+siglam2_lower_bound = 0.0001
 
 def adaptive_inflation(x, y, z, oev, lambar_prior=1.01, siglam2=0.0001):
     sig2p = np.var(y)
@@ -10,8 +11,8 @@ def adaptive_inflation(x, y, z, oev, lambar_prior=1.01, siglam2=0.0001):
     if sig2p < tol:
         return lambar_prior, siglam2
     new_lam = linear_bayes(x, y, z, oev, lambar_prior, siglam2)
+    new_lam = np.min(max_lam, new_lam)
 
-    siglam2_lower_bound = 0.0001
     if np.abs(siglam2 - siglam2_lower_bound) < tol:
         return new_lam, siglam2
     else:
