@@ -154,11 +154,12 @@ def rt_rmse(kf, peaks=None):
             try:
                 peak = peaks[0]
                 rmse = np.sqrt(np.mean((rt_kf[peak].T - kf.data.rt[peak])**2, axis=0))
-            except ValueError as ve:
+            except IndexError as ve:
                 print(f"ValueError: {ve}. Please enter a valid number.")
-        except ValueError as ve:
+                return np.nan
+        except IndexError as ve:
             print(f"ValueError: {ve}. Please enter a valid number.")
-            return np.inf
+            return np.nan
 
     else:
         rt_kf = np.array([θ.beta * θ.t_I for θ in kf.θ_list])
