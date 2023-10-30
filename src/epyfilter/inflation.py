@@ -11,7 +11,7 @@ def adaptive_inflation(x, y, z, oev, lambar_prior=1.01, siglam2=0.0001):
     if sig2p < tol:
         return lambar_prior, siglam2
     new_lam = linear_bayes(x, y, z, oev, lambar_prior, siglam2)
-    new_lam = np.min(max_lam, new_lam)
+    new_lam = min(max_lam, new_lam)
 
     if np.abs(siglam2 - siglam2_lower_bound) < tol:
         return new_lam, siglam2
