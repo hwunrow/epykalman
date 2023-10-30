@@ -3,6 +3,8 @@ import argparse
 import numpy as np
 import pandas as pd
 import pickle
+import logging
+from tqdm import tqdm
 from epyfilter import model_da, eakf, enks, posterior_checks, simulate_data
 
 from numpy.random import uniform
@@ -11,8 +13,19 @@ from numpy.random import uniform
 if __name__ == '__main__':
     try:
         sge_task_id = int(os.environ.get("SGE_TASK_ID"))
+        sge_outputs_file = os.environ.get('SGE_STDOUT_PATH')
     except:
         sge_task_id = 1
+    
+    logger = logging.getLogger('my_logger')
+    logger.setLevel(logging.INFO)
+
+    if sge_outputs_file:
+        sg_outputs_handler = logging.FileHandler(sge_outputs_file)
+        sg_outputs_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        sg_outputs_handler.setFormatter(formatter)
+        logger.addHandler(sg_outputs_handler)
 
     parser = argparse.ArgumentParser(
         description="Run EAKF with adaptive, fixed, and no inflation for 1000 different synthetic data sets",
@@ -39,7 +52,7 @@ if __name__ == '__main__':
 
     np.random.seed(1994)
 
-    files_per_task = 1000
+    files_per_task = 100
     df = pd.read_csv(os.path.join(args.in_dir, "pickle_list.csv"))
     start_row = (sge_task_id - 1) * files_per_task
     end_row = sge_task_id * files_per_task
@@ -48,7 +61,7 @@ if __name__ == '__main__':
     else:
         pickle_files = df.iloc[start_row:, 0]
 
-    for i, pickle_file in enumerate(pickle_files):
+    for i, pickle_file in enumerate(tqdm(pickle_files)):
         param_num = os.path.basename(pickle_file).split("_")[0]
 
         with open(pickle_file, 'rb') as file:
@@ -158,3 +171,4 @@ if __name__ == '__main__':
         
         check_df = check_df.groupby("method").mean()
         check_df.to_csv(f"{args.out_dir}/{param_num}_eakf_metrics.csv", index=True)
+        logger.info(f"{param_num} saved csv")
