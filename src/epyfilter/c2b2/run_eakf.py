@@ -16,16 +16,16 @@ if __name__ == '__main__':
         sge_outputs_file = os.environ.get('SGE_STDOUT_PATH')
     except:
         sge_task_id = 1
+        sge_outputs_file = "test.log"
     
     logger = logging.getLogger('my_logger')
     logger.setLevel(logging.INFO)
 
-    if sge_outputs_file:
-        sg_outputs_handler = logging.FileHandler(sge_outputs_file)
-        sg_outputs_handler.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        sg_outputs_handler.setFormatter(formatter)
-        logger.addHandler(sg_outputs_handler)
+    sg_outputs_handler = logging.FileHandler(sge_outputs_file)
+    sg_outputs_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    sg_outputs_handler.setFormatter(formatter)
+    logger.addHandler(sg_outputs_handler)
 
     parser = argparse.ArgumentParser(
         description="Run EAKF with adaptive, fixed, and no inflation for 1000 different synthetic data sets",
