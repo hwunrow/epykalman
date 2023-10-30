@@ -2,8 +2,7 @@
 #' @Author: Han Yong Wunrow (nhw2114)
 #' @Description: Run EpiEstim on C2B2
 ################################################################################
-library(argparse, lib.loc = "filepath")
-library(data.table)
+pacman::p_load(argparse,data.table)
 
 # Get arguments from parser
 parser <- ArgumentParser()
@@ -18,5 +17,9 @@ list2env(args, environment()); rm(args)
 
 # Get params from parameter map
 task_id <- as.integer(Sys.getenv("SGE_TASK_ID"))
-parameters <- fread(file.path(code_dir, "check_again.csv"))
-location <- parameters[task_id, location_id]
+pickles <- fread(file.path(in_dir, "pickle_list.csv"))
+file <- parameters[task_id, filepath]
+
+# reack in synthetic data pickle file
+source_python("open_pickle_rt.py")
+pickle_data <- open_pickle_rt(file)
