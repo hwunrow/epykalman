@@ -53,13 +53,14 @@ if __name__ == '__main__':
     np.random.seed(1994)
 
     files_per_task = 10
-    df = pd.read_csv(os.path.join(args.in_dir, "pickle_list.csv"))
+    df = pd.read_csv(os.path.join(args.in_dir, "good_param_list.csv"))
     start_row = (sge_task_id - 1) * files_per_task
     end_row = sge_task_id * files_per_task
     if end_row < len(df):
         pickle_files = df.iloc[start_row:end_row, 0]
     else:
         pickle_files = df.iloc[start_row:, 0]
+    pickle_files = [f"/ifs/scratch/jls106_gp/nhw2114/data/20231025_synthetic_data/{p}_synthetic_data.pkl" for p in pickle_files]
 
     for i, pickle_file in enumerate(tqdm(pickle_files)):
         param_num = os.path.basename(pickle_file).split("_")[0]
