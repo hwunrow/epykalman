@@ -247,7 +247,7 @@ class EnsembleAdjustmentKalmanFilter():
         fig, ax = plt.subplots(1)
         ax.plot(i, color='gray', alpha=0.1)
         ax.plot(self.data.i_true, 'x', color='black', label="truth")
-        ax.set_title("free simulation - all ensembles")
+        ax.set_title(f"free simulation - all ensembles {name}")
 
         ci = np.quantile(i, q=[0.025, 0.975], axis=1)
         ci_50 = np.quantile(i, q=[0.25, 0.75], axis=1)
@@ -261,7 +261,7 @@ class EnsembleAdjustmentKalmanFilter():
         ax.plot(self.data.i_true, 'x', color='black', label="truth")
         ax.legend(loc='upper left')
 
-        ax.set_title("free simulation")
+        ax.set_title(f"free simulation {name}")
 
         prop_95 = np.mean((ci[0] <= self.data.i) & (self.data.i <= ci[1]))
         prop_50 = np.mean(
@@ -279,7 +279,7 @@ class EnsembleAdjustmentKalmanFilter():
         ax.axline((0, 0), (1, 1), color='r')
         ax.set_xlabel('CI')
         ax.set_ylabel('% of obs within CI')
-        ax.set_title("observation reliability plot")
+        ax.set_title(f"observation reliability plot {name}")
 
         betas = np.asarray([θ.beta for θ in self.θ_list])
         betas_skip = betas[15:, :]
@@ -294,7 +294,7 @@ class EnsembleAdjustmentKalmanFilter():
         ax.axline((0, 0), (1, 1), color='r')
         ax.set_xlabel('CI')
         ax.set_ylabel(r'% of $\beta$ within CI')
-        ax.set_title(r"$\beta$ reliability plot")
+        ax.set_title(rf"$\beta$ reliability plot {name}")
 
         # for p in percentiles:
         #     S, Ir, R, i = self.free_sim(np.quantile(betas_skip, q=p/100))
@@ -340,7 +340,7 @@ class EnsembleAdjustmentKalmanFilter():
         ax[3].set_xlabel("day")
         ax[3].set_ylabel(r"$\sigma^2_{\lambda}$")
 
-        fig.suptitle('EAKF full time series adaptive inflation')
+        fig.suptitle(f'EAKF full time series {name}')
 
         if path:
             plt.savefig(f'{path}/{name}.pdf')
@@ -356,7 +356,7 @@ class EnsembleAdjustmentKalmanFilter():
             [], [], color='grey', label='Data Distribution')
         ax[0].legend(handles=[blue_line, grey_line])
         ax[0].set_title(
-            "Data Distribution vs EAKF Posterior Predictive Distribution")
+            f"Data Distribution vs EAKF Posterior Predictive Distribution {name}")
         ax[1].plot(self.data.data_distribution, color="gray", alpha=0.01)
         ax[2].plot(self.i_ppc, color="blue", alpha=0.01)
 
