@@ -210,6 +210,35 @@ class EnsembleAdjustmentKalmanFilter():
         self.i_ppc = i
 
         return S, Ir, R, i
+    
+    def compute_reliability(self, percentiles):
+        prop_list = []
+        betas = np.asarray([θ.beta for θ in self.θ_list])
+        _, _, _, i = self.free_sim(betas)
+        for p in percentiles:
+            lower = np.quantile(
+                i, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[0, :]
+            upper = np.quantile(
+                i, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[1, :]
+            pp = (lower <= self.data.i) & (self.data.i <= upper)
+            prop_list.append(np.mean(pp[np.where(self.data.i > 5)]))
+        self.prop_list = prop_list
+    
+    def compute_beta_reliability(self, percentiles):
+        betas = np.asarray([θ.beta for θ in self.θ_list])
+        betas_skip = betas[15:, :]
+        beta_true = self.data.beta
+        beta_true = beta_true[15:]
+
+        prop_list = []
+        for p in percentiles:
+            lower = np.quantile(
+                betas_skip, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[0, :]
+            upper = np.quantile(
+                betas_skip, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[1, :]
+            prop_list.append(
+                np.mean((lower <= beta_true) & (beta_true <= upper)))
+        self.beta_prop_list = prop_list
 
     def plot_reliability(self, path=None, name='eakf_reliability'):
         betas = np.asarray([θ.beta for θ in self.θ_list])
@@ -241,18 +270,12 @@ class EnsembleAdjustmentKalmanFilter():
         print(f"Percent of observations in 95% CI {round(prop_95*100, 2)}%")
         print(f"Percent of observations in 50% CI {round(prop_50*100, 2)}%")
 
-        prop_list = []
         percentiles = np.arange(2.5, 100, 2.5)
-        for p in percentiles:
-            lower = np.quantile(
-                i, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[0, :]
-            upper = np.quantile(
-                i, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[1, :]
-            prop_list.append(np.mean(
-                (lower <= self.data.i) & (self.data.i <= upper)))
+        if not hasattr(self, "prop_list"):
+            self.compute_reliability(percentiles)
 
         fig, ax = plt.subplots(1)
-        ax.plot(percentiles/100, prop_list, '-.')
+        ax.plot(percentiles/100, self.prop_list, '-.')
         ax.axline((0, 0), (1, 1), color='r')
         ax.set_xlabel('CI')
         ax.set_ylabel('% of obs within CI')
@@ -263,17 +286,11 @@ class EnsembleAdjustmentKalmanFilter():
         beta_true = self.data.beta
         beta_true = beta_true[15:]
 
-        prop_list = []
-        for p in percentiles:
-            lower = np.quantile(
-                betas_skip, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[0, :]
-            upper = np.quantile(
-                betas_skip, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[1, :]
-            prop_list.append(
-                np.mean((lower <= beta_true) & (beta_true <= upper)))
+        if not hasattr(self, "beta_prop_list"):
+            self.compute_beta_reliability(percentiles)
 
         fig, ax = plt.subplots(1)
-        ax.plot(percentiles/100, prop_list, '-.')
+        ax.plot(percentiles/100, self.beta_prop_list, '-.')
         ax.axline((0, 0), (1, 1), color='r')
         ax.set_xlabel('CI')
         ax.set_ylabel(r'% of $\beta$ within CI')

@@ -1,14 +1,24 @@
 import numpy as np
 
 def check_param_in_ci(kf, day, percentile=95):
-    assert isinstance(day, int), "day must be integer"
     post_betas = np.asarray([θ.beta for θ in kf.θ_list])
     quantiles = [(1-percentile/100)/2, 1-(1-percentile/100)/2]
     quantiles_beta = np.quantile(post_betas, q=quantiles, axis=1)
     lower = quantiles_beta[0, :]
     upper = quantiles_beta[1, :]
+    if day == "last":
+        return lower[-1] <= kf.data.beta[-1] <= upper[-1]
+    else:
+        assert isinstance(day, int), "day must be integer"
+        return lower[day] <= kf.data.beta[day] <= upper[day]
 
-    return lower[day] <= kf.data.beta[day] <= upper[day]
+
+def compute_ens_var(kf, day):
+    if day == "last":
+        return np.var(np.asarray([θ.beta for θ in kf.θ_list])[-1])
+    else:
+        assert isinstance(day, int), "day must be integer"
+        return np.var(np.asarray([θ.beta for θ in kf.θ_list])[day])
 
 
 def avg_kl_divergence(kf, min_i=100, num_bins=10):
@@ -75,16 +85,26 @@ def avg_wasserstein2_ks(ks, min_i=100, num_bins=10):
     return np.mean(w2_list)
 
 
+def compute_ens_var_ks(ks, day):
+    if day == "last":
+        return np.var(np.asarray([θ.beta for θ in ks.θ_lag_list])[-1])
+    else:
+        assert isinstance(day, int), "day must be integer"
+        return np.var(np.asarray([θ.beta for θ in ks.θ_lag_list])[day])
+
+
 def check_param_in_ci_ks(ks, day, percentile=95):
-    assert isinstance(day, int), "day must be integer"
-    assert day < len(ks.θ_lag_list)
     post_betas = np.asarray([θ.beta for θ in ks.θ_lag_list])
     quantiles = [(1-percentile/100)/2, 1-(1-percentile/100)/2]
     quantiles_beta = np.quantile(post_betas, q=quantiles, axis=1)
     lower = quantiles_beta[0, :]
     upper = quantiles_beta[1, :]
-
-    return lower[day] <= ks.data.beta[day] <= upper[day]
+    if day == "last":
+        return lower[-1] <= ks.data.beta[-1] <= upper[-1]
+    else:
+        assert isinstance(day, int), "day must be integer"
+        assert day < len(ks.θ_lag_list)
+        return lower[day] <= ks.data.beta[day] <= upper[day]
 
 
 def bin_data(d, d_pp, num_bins, bins=None):

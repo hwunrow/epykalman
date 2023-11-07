@@ -92,15 +92,19 @@ if __name__ == '__main__':
         peak_days, = np.where(np.diff(np.sign(np.diff(det_data.i_true))) == -2)  # days where it increases before then decreases
         peak_days = peak_days[:2]  # just take first two days
 
-        columns=["method", "rt_peak_rmse", "rt_rmse", "data_rmse","avg_w2","avg_kl","in_ci"]
+        columns=["method", "rt_peak_rmse", "rt_rmse", "data_rmse","avg_w2","avg_kl","in_ci","ens_var","in_ci_last_day","ens_var_last_day"]
         check_df = pd.DataFrame(columns=columns)
+        names = ["percentile","adaptive","adaptive_beta","no","no_beta","fixed","fixed_beta","smooth","smooth_beta"]
+        reliability_df = pd.DataFrame(columns=names)
 
         for r in range(args.n_real):
-
             # adaptive inflation 
             kf = eakf.EnsembleAdjustmentKalmanFilter(model, m=args.n_ens)
             kf.filter(prior)
-            
+            percentiles = np.arange(2.5, 100, 2.5)
+            kf.compute_reliability(percentiles)
+            kf.compute_beta_reliability(percentiles)
+
             if r == 0:
                 kf.plot_posterior(path=args.out_dir, name=f"{param_num}_eakf_posterior_adaptive_inflation")
                 kf.plot_reliability(path=args.out_dir, name=f"{param_num}_eakf_reliability_adaptive_inflation")
@@ -113,13 +117,18 @@ if __name__ == '__main__':
                  posterior_checks.data_rmse(kf),
                  posterior_checks.avg_wasserstein2(kf),
                  posterior_checks.avg_kl_divergence(kf),
-                 posterior_checks.check_param_in_ci(kf,late_day)]
+                 posterior_checks.check_param_in_ci(kf,late_day),
+                 posterior_checks.compute_ens_var(kf,late_day),
+                 posterior_checks.check_param_in_ci(kf,"last"),
+                 posterior_checks.compute_ens_var(kf,"last")]
                  ], columns=columns)
             check_df = pd.concat([check_df, kf_checks], ignore_index=True)
 
             # no inflation
             kf_no = eakf.EnsembleAdjustmentKalmanFilter(model, m=args.n_ens)
             kf_no.filter(prior, inf_method="none")
+            kf_no.compute_reliability(percentiles)
+            kf_no.compute_beta_reliability(percentiles)
 
             if r == 0:
                 kf_no.plot_posterior(path=args.out_dir, name=f"{param_num}_eakf_posterior_no_inflation")
@@ -133,14 +142,19 @@ if __name__ == '__main__':
                  posterior_checks.data_rmse(kf_no),
                  posterior_checks.avg_wasserstein2(kf_no),
                  posterior_checks.avg_kl_divergence(kf_no),
-                 posterior_checks.check_param_in_ci(kf_no,late_day)]
+                 posterior_checks.check_param_in_ci(kf_no,late_day),
+                 posterior_checks.compute_ens_var(kf_no,late_day),
+                 posterior_checks.check_param_in_ci(kf_no,"last"),
+                 posterior_checks.compute_ens_var(kf_no,"last")]
                  ], columns=columns)
             check_df = pd.concat([check_df, kf_no_checks], ignore_index=True)
 
             # fixed inflation 
             kf_fixed = eakf.EnsembleAdjustmentKalmanFilter(model, m=args.n_ens)
             kf_fixed.filter(prior, inf_method="constant", lam_fixed=args.fixed_inf)
-            
+            kf_fixed.compute_reliability(percentiles)
+            kf_fixed.compute_beta_reliability(percentiles)
+
             if r == 0:
                 kf_fixed.plot_posterior(path=args.out_dir, name=f"{param_num}_eakf_posterior_fixed_inflation")
                 kf_fixed.plot_reliability(path=args.out_dir, name=f"{param_num}_eakf_reliability_fixed_inflation")
@@ -153,12 +167,18 @@ if __name__ == '__main__':
                 posterior_checks.data_rmse(kf_fixed),
                 posterior_checks.avg_wasserstein2(kf_fixed),
                 posterior_checks.avg_kl_divergence(kf_fixed),
-                posterior_checks.check_param_in_ci(kf_fixed, late_day)]
-                ], columns=columns)
+                posterior_checks.check_param_in_ci(kf_fixed,late_day),
+                posterior_checks.compute_ens_var(kf_fixed,late_day),
+                posterior_checks.check_param_in_ci(kf_fixed,"last"),
+                posterior_checks.compute_ens_var(kf_fixed,"last")]
+            ], columns=columns)
             check_df = pd.concat([check_df, kf_fixed_checks], ignore_index=True)
 
             ks = enks.EnsembleSquareRootSmoother(kf)
             ks.smooth(window_size=10, plot=False)
+            ks.compute_reliability(percentiles)
+            ks.compute_beta_reliability(percentiles)
+
             ks_checks = pd.DataFrame([
                 ["smooth",
                  posterior_checks.rt_rmse(ks, peaks=peak_days),
@@ -166,10 +186,25 @@ if __name__ == '__main__':
                  posterior_checks.data_rmse(ks),
                  posterior_checks.avg_wasserstein2_ks(ks),
                  posterior_checks.avg_kl_divergence_ks(ks),
-                 posterior_checks.check_param_in_ci_ks(ks, late_day)]
+                 posterior_checks.check_param_in_ci_ks(ks,late_day),
+                 posterior_checks.compute_ens_var_ks(ks,late_day),
+                 posterior_checks.check_param_in_ci_ks(ks,"last"),
+                 posterior_checks.compute_ens_var_ks(ks,"last")]
                 ], columns=columns)
             check_df = pd.concat([check_df, ks_checks], ignore_index=True)
+
+            tmp_df = pd.DataFrame(np.array([
+                percentiles,
+                kf.prop_list, kf.beta_prop_list,
+                kf_no.prop_list, kf_no.beta_prop_list,
+                kf_fixed.prop_list, kf_fixed.beta_prop_list,
+                ks.prop_list, ks.beta_prop_list]).T,
+                columns=names)
+            reliability_df = pd.concat([reliability_df, tmp_df], ignore_index=True)
         
+        reliability_df = reliability_df.groupby("percentile").mean()
+        reliability_df.to_csv(f"{args.out_dir}/{param_num}_reliability.csv", index=True)
+
         check_df = check_df.groupby("method").mean()
         check_df.to_csv(f"{args.out_dir}/{param_num}_eakf_metrics.csv", index=True)
         logger.info(f"{param_num} saved csv")

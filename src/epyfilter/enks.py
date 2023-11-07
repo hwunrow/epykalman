@@ -250,6 +250,35 @@ class EnsembleSquareRootSmoother:
         
         self.θ_list = θ_lag_list
         self.x_list = x_lag_list
+    
+    def compute_reliability(self, percentiles):
+        prop_list = []
+        betas = np.asarray([θ.beta for θ in self.θ_list])
+        _, _, _, i = self.free_sim(betas)
+        for p in percentiles:
+            lower = np.quantile(
+                i, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[0, :]
+            upper = np.quantile(
+                i, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[1, :]
+            pp = (lower <= self.data.i[:len(i)]) & (self.data.i[:len(i)] <= upper)
+            prop_list.append(np.mean(pp[np.where(self.data.i[:len(i)] > 5)]))
+        self.prop_list = prop_list
+    
+    def compute_beta_reliability(self, percentiles):
+        betas = np.asarray([θ.beta for θ in self.θ_list])
+        betas_skip = betas[15:, :]
+        beta_true = self.data.beta
+        beta_true = beta_true[15:]
+
+        prop_list = []
+        for p in percentiles:
+            lower = np.quantile(
+                betas_skip, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[0, :]
+            upper = np.quantile(
+                betas_skip, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[1, :]
+            prop_list.append(
+                np.mean((lower <= beta_true[:len(betas_skip)]) & (beta_true[:len(betas_skip)] <= upper)))
+        self.beta_prop_list = prop_list
 
     def free_sim(self, beta):
         S = np.array([self.data.S0 * np.ones(self.eakf.m)])
