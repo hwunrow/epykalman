@@ -9,17 +9,19 @@ import numpy as np
 def open_pickle(pickle_file):
   with open(pickle_file, 'rb') as file:
     data = pickle.load(file)
-  rt = data.rt
-  return rt
+
+  return data
 
 
 if __name__ == '__main__':
     try:
         sge_task_id = int(os.environ.get("SGE_TASK_ID"))
         sge_outputs_file = os.environ.get('SGE_STDOUT_PATH')
+        files_per_task = 1000
     except:
         sge_task_id = 1
         sge_outputs_file = "test.log"
+        files_per_task = 100_185
     
     logger = logging.getLogger('my_logger')
     logger.setLevel(logging.INFO)
@@ -41,7 +43,6 @@ if __name__ == '__main__':
         help="Directory to save plots and files.")
     args = parser.parse_args()
 
-    files_per_task = 1000
     df = pd.read_csv(os.path.join(args.in_dir, "pickle_list.csv"))
     start_row = (sge_task_id - 1) * files_per_task
     end_row = sge_task_id * files_per_task
@@ -51,6 +52,8 @@ if __name__ == '__main__':
       pickle_files = df.iloc[start_row:, 0]
 
     for i, pickle_file in enumerate(tqdm(pickle_files)):
-      rt = open_pickle(pickle_file)
+      data = open_pickle(pickle_file)
       param_num = os.path.basename(pickle_file).split("_")[0]
-      pd.DataFrame(rt).to_csv(f"{args.out_dir}/{param_num}_rt.csv", index=False)
+      tmp_df = pd.DataFrame(np.stack([data.rt,data.i[1:], data.S[1:]/data.N]).T, columns=["rt","i","prop_S"])
+      tmp_df.to_csv(f"{args.out_dir}/{param_num}_for_epiestim.csv", index=False)
+      logger.info(param_num)
