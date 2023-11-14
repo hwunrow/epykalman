@@ -7,7 +7,6 @@
 #' @param job_name -N name The name of the job.
 #' @param tasks -t number of jobs within array job
 #' @param mem  -l mem = Memory usage
-#' @param fthread -pe smp
 #' @param time -l time = Time for your job
 #' @param holds -hold_jid list of job names to wait for
 #' @param output -o The path used for the standard output stream of the job
@@ -20,7 +19,6 @@
 #' 
 #' @example: qsub(
 #'              job_name = job_name,
-#'              slots = slots,
 #'              mem = mem,
 #'              shell_file = shell_file,
 #'              script = parallel_script,
@@ -29,17 +27,16 @@
 ################################################################################
 ################################################################################
 
-qsub_new <- function(job_name = "array_job",
-                     tasks = NULL, 
-                     mem = "1G", 
-                     fthread = NULL, 
-                     time = NULL,
-                     holds = NULL, 
-                     output = paste0("/ihme/temp/sgeoutput/", Sys.info()["user"], "/output"), 
-                     error = paste0("/ihme/temp/sgeoutput/", Sys.info()["user"], "/errors"),
-                     shell_file, 
-                     script,
-                     args = NULL) {
+qsub <- function(job_name = "array_job",
+                 tasks = NULL, 
+                 mem = "1G", 
+                 time = NULL,
+                 holds = NULL, 
+                 output = NULL, 
+                 error = NULL,
+                 shell_file, 
+                 script,
+                 args = NULL) {
   # check for required arguments
   if (is.null(shell_file)) stop("Did not specify a shell script, please provide one before running again")
   if (is.null(script))     stop("Did not specify a computation script (script parameter), please provide one before running again")
@@ -51,7 +48,6 @@ qsub_new <- function(job_name = "array_job",
   if (!is.null(tasks))   my_tasks   <- paste("-t", tasks, "-tc 500")  else my_tasks   <- "" # -tc limits the number of child jobs that can be running at once
   my_mem                            <- paste0("-l mem=", mem)
   my_time                           <- paste0("time=", time)
-  my_fthread                        <- paste("-pe smp ", fthread)     else my_fthread <- ""
   if (!is.null(holds))   my_holds   <- paste("-hold_jid", holds)      else my_holds   <- "" 
   if (!is.null(output))  my_output  <- paste("-o", output)            else my_output  <- ""
   if (!is.null(error))   my_error   <- paste("-e", error)             else my_error   <- ""
@@ -59,7 +55,20 @@ qsub_new <- function(job_name = "array_job",
   my_code                           <- paste(script)
   if (!is.null(args))    my_args    <- paste(args)                    else my_args    <- ""
   
-  my_qsub <- paste("qsub", my_job, my_project, my_tasks, my_mem, my_fthread, my_time, my_holds, my_output, my_error, my_shell, my_code, my_args)
+  my_qsub <-
+    paste(
+      "qsub",
+      my_job,
+      my_tasks,
+      my_mem,
+      my_time,
+      my_holds,
+      my_output,
+      my_error,
+      my_shell,
+      my_code,
+      my_args
+    )
   print(my_qsub)
   
   # submit job
