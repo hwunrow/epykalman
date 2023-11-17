@@ -34,6 +34,111 @@ compute_ens_var <- function(dt, dd) {
   }
 }
 
+bin_data <- function(d, d_pp, num_bins, bins = NULL) {
+  data_min <- min(c(min(d), min(d_pp)))
+  data_max <- max(c(max(d), max(d_pp)))
+  
+  if (is.null(bins)) {
+    bins <- seq(data_min, data_max, length.out = num_bins)
+  }
+  
+  digitized <- findInterval(d, bins)
+  digitized_pp <- findInterval(d_pp, bins)
+  
+  return(list(digitized, digitized_pp, bins))
+}
+
+compute_probs <- function(digitized_data, num_bins) {
+  counts <- table(factor(digitized_data, levels = 1:num_bins, exclude = NULL))
+  probs <- counts / length(digitized_data)
+  return(probs)
+}
+
+kl_divergence <- function(p_sample, q_sample, epsilon=1e-10, num_bins=10) {
+  stopifnot(length(p_sample) == length(q_sample))
+  
+  bin_data_result <- bin_data(p_sample, q_sample, num_bins)
+  p_bins <- bin_data_result[[1]]
+  q_bins <- bin_data_result[[2]]
+  bins <- bin_data_result[[3]]
+  
+  p_probs <- compute_probs(p_bins, num_bins)
+  q_probs <- compute_probs(q_bins, num_bins)
+  
+  p_safe = p_probs + epsilon
+  q_safe = q_probs + epsilon
+  
+  return(sum(p_safe * log(p_safe / q_safe)))
+}
+
+avg_kl_divergence <- function(dt, synthetic_dt, data_dt, i_ppc, min_i = 100, num_bins = 10) {
+  days <- synthetic_dt[i >= min_i, day]
+  samplecols <- paste0("sample", 1:300)
+  
+  avg_kl_window <- function(w) {
+    tmp_list <- c()
+    for (t in days) {
+      # Calculate kl
+      kl <- kl_divergence(data_dt[day == t, ..samplecols],
+                         i_ppc[day == t & window == w, ..samplecols],
+                         num_bins = num_bins)
+      tmp_list <- c(tmp_list, kl)
+    }
+    return(data.table(window = w, avg_kl = mean(tmp_list)))
+  }
+  
+  return(rbindlist(lapply(unique(dt$window), avg_kl_window)))
+}
+
+
+wasserstein2 <- function(p_sample, q_sample, num_bins = 10) {
+  stopifnot(length(p_sample) == length(q_sample))
+  
+  bin_data_result <- bin_data(p_sample, q_sample, num_bins)
+  p_bins <- bin_data_result[[1]]
+  q_bins <- bin_data_result[[2]]
+  bins <- bin_data_result[[3]]
+  
+  p_probs <- compute_probs(p_bins, num_bins)
+  q_probs <- compute_probs(q_bins, num_bins)
+  
+  stopifnot(length(p_probs) == length(q_probs))
+  # stopifnot(sum(p_probs) == 1.0, paste("Dist p must sum to 1", sum(p_probs)))
+  # stopifnot(sum(q_probs) == 1.0, paste("Dist q must sum to 1", sum(q_probs)))
+  
+  # Compute the cumulative sums
+  p_cdf <- cumsum(p_probs)
+  q_cdf <- cumsum(q_probs)
+  
+  # Calculate the squared distances between the cumulative sums
+  squared_distances <- (p_cdf - q_cdf)^2
+  
+  # Compute the W-2 metric
+  w2 <- sqrt(sum(squared_distances))
+  
+  return(w2)
+}
+
+
+avg_wasserstein2 <- function(dt, synthetic_dt, data_dt, i_ppc, min_i = 100, num_bins = 10) {
+  days <- synthetic_dt[i >= min_i, day]
+  samplecols <- paste0("sample", 1:300)
+  
+  avg_w2_window <- function(w) {
+    tmp_list <- c()
+    for (t in days) {
+      # Calculate w2
+      w2 <- wasserstein2(data_dt[day == t, ..samplecols],
+                         i_ppc[day == t & window == w, ..samplecols],
+                         num_bins = num_bins)
+      tmp_list <- c(tmp_list, w2)
+    }
+    return(data.table(window = w, avg_w2 = mean(tmp_list)))
+  }
+  
+  return(rbindlist(lapply(unique(dt$window), avg_w2_window)))
+}
+
 free_sim <- function(beta_dt, synthetic_dt) {
   m <- 300
   N <- 100000
@@ -87,14 +192,13 @@ data_rmse <- function(dt, synthetic_dt) {
   beta_dt <- dt[, ..samplecols] * gamma
   beta_dt$day <- dt$day
   beta_dt$window <- dt$window
-  i_dt <- free_sim(beta_dt, synthetic_dt)
-  i_dt <- merge(i_dt, synthetic_dt[, .(day,i)], by="day")
+  i_ppc <- free_sim(beta_dt, synthetic_dt)
+  i_dt <- merge(i_ppc, synthetic_dt[, .(day,i)], by="day")
 
   # compute rmse
   i_dt$sqdiff <- rowMeans((i_dt$i - i_dt[, samplecols, with=FALSE])^2)
-  return(i_dt[, .(data_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window])
+  return(list(rmse_dt = i_dt[, .(data_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window], i_ppc = i_ppc))
 }
-
 
 rt_rmse <- function(dt, peaks=NULL) {
   dt_copy <- copy(dt)

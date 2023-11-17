@@ -3,15 +3,19 @@
 #' @Description: Run EpiEstim on C2B2
 ################################################################################
 rm(list=ls())
-pacman::p_load(argparse, data.table, EpiEstim, ggplot2)
-.libPaths("/ifs/home/jls106_gp/nhw2114/R/x86_64-pc-linux-gnu-library/4.3");
+.libPaths("/ifs/home/jls106_gp/nhw2114/R/x86_64-pc-linux-gnu-library/4.3/")
+library(argparse)
+library(data.table)
+library(ggplot2)
+library(EpiEstim)
+library(matrixStats)
 source("/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/qsub.R")
 source("/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/posterior_checks.R")
 
 # Get arguments from parser
 parser <- ArgumentParser()
 parser$add_argument("--in-dir", help = "directory for external inputs", default = "/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/", type = "character")
-parser$add_argument("--data-dir", help = "directory for synthetic inputs", default = "/ifs/scratch/jls106_gp/nhw2114/data/20231106_synthetic_data/", type = "character")
+parser$add_argument("--data-dir", help = "directory for synthetic inputs", default = "/ifs/scratch/jls106_gp/nhw2114/data/20231025_synthetic_data/", type = "character")
 parser$add_argument("--out-dir", help = "directory for this steps checks", default = "/ifs/scratch/jls106_gp/nhw2114/data/20231106_synthetic_data/", type = "character")
 parser$add_argument("--files-per-task", help = "number of files per array job", default = 10, type = "integer")
 
@@ -21,6 +25,7 @@ list2env(args, environment()); rm(args)
 
 # Get params from parameter map
 task_id <- as.integer(Sys.getenv("SGE_TASK_ID"))
+print(task_id)
 if (is.na(task_id)) {
   task_id <- 1
 }
@@ -38,7 +43,7 @@ for (file in files) {
   param_num <- strsplit(basename(file), "_")[[1]][1]
   
   # read in data distribution, late_day, and peaks used for posterior checks
-  data_dt <- fread(paste0(data_dir, param_num, "_data_distribution.csv"))
+  data_dt <- fread(paste0(out_dir, param_num, "_data_distribution.csv"))
   late_day <- unique(data_dt$late_day)
   peaks <- c(unique(data_dt$peak1), unique(data_dt$peak2))
   
@@ -103,17 +108,22 @@ for (file in files) {
   fwrite(R_posterior_all_dt, file=paste0(out_dir,"/",param_num, "_epiEstim_draws.csv"))
   
   # posterior checks
-  rt_rmse(R_posterior_all_dt, peaks)
-  rt_rmse(R_posterior_all_dt)
-  data_rmse(R_posterior_all_dt, synthetic_dt)
+  data_rmse_result <- data_rmse(R_posterior_all_dt, synthetic_dt)
+  rmse_dt <- data_rmse_result$rmse_dt
+  i_ppc <- data_rmse_result$i_ppc
   
-  avg_wasserstein2(R_posterior_all_dt, data_dt)
-  avg_kl_divergence(R_posterior_all_dt, data_dt)
-  
-  check_param_in_ci(R_posterior_all_dt, late_day)
-  compute_ens_var(R_posterior_all_dt, late_day)
-  check_param_in_ci(R_posterior_all_dt, "last")
-  compute_ens_var(R_posterior_all_dt, "last")
+  post_checks_dt <- Reduce(function(x, y) merge(x, y, by = "window"), list(
+    rt_rmse(R_posterior_all_dt, peaks),
+    rt_rmse(R_posterior_all_dt),
+    rmse_dt,
+    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc),
+    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc),
+    check_param_in_ci(R_posterior_all_dt, late_day),
+    compute_ens_var(R_posterior_all_dt, late_day),
+    check_param_in_ci(R_posterior_all_dt, "last"),
+    compute_ens_var(R_posterior_all_dt, "last")
+  ))
+  fwrite(post_checks_dt, file=paste0(out_dir,"/",param_num, "_epiEstim_metrics.csv"))
   
   pdf(paste0(out_dir,"/",param_num,"_epiEsim_plots.pdf"), width = 8, height = 6)
   for (i in 1:20) {
@@ -122,18 +132,4 @@ for (file in files) {
   }
   dev.off()
 }
-
-# kf_fixed_checks = pd.DataFrame([
-#   ["fixed inflation",
-#    posterior_checks.rt_rmse(kf_fixed, peaks=peak_days),
-#    posterior_checks.rt_rmse(kf_fixed),
-#    posterior_checks.data_rmse(kf_fixed),
-#    posterior_checks.avg_wasserstein2(kf_fixed),
-#    posterior_checks.avg_kl_divergence(kf_fixed),
-#    posterior_checks.check_param_in_ci(kf_fixed,late_day),
-#    posterior_checks.compute_ens_var(kf_fixed,late_day),
-#    posterior_checks.check_param_in_ci(kf_fixed,"last"),
-#    posterior_checks.compute_ens_var(kf_fixed,"last")]
-# ], columns=columns)
-
 
