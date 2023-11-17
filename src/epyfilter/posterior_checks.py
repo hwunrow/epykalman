@@ -134,7 +134,7 @@ def kl_divergence(p_sample, q_sample, epsilon=1e-10, num_bins=10):
 
     p_safe = p_probs + epsilon
     q_safe = q_probs + epsilon
-    np.sum(p_safe * np.log(p_safe / q_safe))
+
     return np.sum(p_safe * np.log(p_safe / q_safe))
 
 
