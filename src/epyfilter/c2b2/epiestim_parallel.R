@@ -39,8 +39,11 @@ if (end_row < nrow(dt)) {
 }
 files <- paste0(data_dir, pickle_files$param, "_for_epiestim.csv")
 
+last_epidemic_days = fread(paste0(in_dir,"last_epidemic_day.csv"))
+
 for (file in files) {
   param_num <- strsplit(basename(file), "_")[[1]][1]
+  last_epi_day <- last_epidemic_days[param == param_num]$last_epidemic_day
   
   # read in data distribution, late_day, and peaks used for posterior checks
   data_dt <- fread(paste0(out_dir, param_num, "_data_distribution.csv"))
@@ -115,13 +118,19 @@ for (file in files) {
   post_checks_dt <- Reduce(function(x, y) merge(x, y, by = "window"), list(
     rt_rmse(R_posterior_all_dt, peaks),
     rt_rmse(R_posterior_all_dt),
+    rt_rmse(R_posterior_all_dt, last_epi_day, last_epi=TRUE),
     rmse_dt,
+    data_rmse(R_posterior_all_dt, synthetic_dt, last_epi_day, last_epi=TRUE),
     avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc),
     avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc),
+    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day),
+    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day),
     check_param_in_ci(R_posterior_all_dt, late_day),
     compute_ens_var(R_posterior_all_dt, late_day),
     check_param_in_ci(R_posterior_all_dt, "last"),
-    compute_ens_var(R_posterior_all_dt, "last")
+    compute_ens_var(R_posterior_all_dt, "last"),
+    check_param_in_ci(R_posterior_all_dt, last_epi_day, last_epi=TRUE),
+    compute_ens_var(R_posterior_all_dt, last_epi_day, last_epi=TRUE)
   ))
   fwrite(post_checks_dt, file=paste0(out_dir,"/",param_num, "_epiEstim_metrics.csv"))
   

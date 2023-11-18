@@ -1,4 +1,4 @@
-check_param_in_ci <- function(dt, dd, percentile = 95) {
+check_param_in_ci <- function(dt, dd, last_epi=FALSE, percentile = 95) {
   quantiles <- c((1 - percentile/100)/2, 1 - (1 - percentile/100)/2)
   if (dd == "last") {
     last_day <- max(dt[window==20, day])
@@ -14,12 +14,17 @@ check_param_in_ci <- function(dt, dd, percentile = 95) {
     percentile_dt <- dt[day==dd, as.list(quantile(.SD, quantiles, na.rm=TRUE)),  .SDcols=paste0("sample", 1:300), by=.(window)]
     truth_dt <- dt[day==dd, .(window, rt)]
     percentile_dt <- merge(percentile_dt, truth_dt, by=c("window"))
-    percentile_dt[, in_ci := `2.5%` <= rt & rt <= `97.5%`]
-    return(percentile_dt[, .(window, in_ci)])
+    if (last_epi) {
+      percentile_dt[, in_ci_last_epi_day := `2.5%` <= rt & rt <= `97.5%`]
+      return(percentile_dt[, .(window, in_ci_last_epi_day)])
+    } else {
+      percentile_dt[, in_ci := `2.5%` <= rt & rt <= `97.5%`]
+      return(percentile_dt[, .(window, in_ci)])
+    }
   }
 }
 
-compute_ens_var <- function(dt, dd) {
+compute_ens_var <- function(dt, dd, last_epi=FALSE) {
   samplecols <- paste0("sample", 1:300)
   if (dd == "last") {
     last_day <- max(dt[window==20, day])
@@ -29,8 +34,13 @@ compute_ens_var <- function(dt, dd) {
     if (!is.numeric(dd)) {
       stop("day must be numeric")
     }
-    return(dt[day==dd, .(ens_var=rowVars(as.matrix(.SD), na.rm=TRUE)),
-              .SDcols=samplecols, by=window])
+    if (last_epi) {
+      return(dt[day==dd, .(ens_var_last_epi_day=rowVars(as.matrix(.SD), na.rm=TRUE)),
+                .SDcols=samplecols, by=window])
+    } else {
+      return(dt[day==dd, .(ens_var=rowVars(as.matrix(.SD), na.rm=TRUE)),
+               .SDcols=samplecols, by=window])
+    }
   }
 }
 
@@ -71,8 +81,12 @@ kl_divergence <- function(p_sample, q_sample, epsilon=1e-10, num_bins=10) {
   return(sum(p_safe * log(p_safe / q_safe)))
 }
 
-avg_kl_divergence <- function(dt, synthetic_dt, data_dt, i_ppc, min_i = 100, num_bins = 10) {
+avg_kl_divergence <- function(dt, synthetic_dt, data_dt, i_ppc, last_epi=FALSE, last_epi_day = NULL, min_i = 100, num_bins = 10) {
   days <- synthetic_dt[i >= min_i, day]
+  if (last_epi) {
+    # compute only for days less than the day when the second epidemic ends
+    days <- days[days <= last_epi_day]
+  }
   samplecols <- paste0("sample", 1:300)
   
   avg_kl_window <- function(w) {
@@ -87,7 +101,14 @@ avg_kl_divergence <- function(dt, synthetic_dt, data_dt, i_ppc, min_i = 100, num
     return(data.table(window = w, avg_kl = mean(tmp_list)))
   }
   
-  return(rbindlist(lapply(unique(dt$window), avg_kl_window)))
+  dt_return <- rbindlist(lapply(unique(dt$window), avg_kl_window))
+  
+  if (last_epi) {
+    names(dt_return)[names(dt_return) == 'avg_kl'] <- 'avg_kl_last_epi_day'
+    return(dt_return)
+  } else {
+    return(dt_return)
+  }
 }
 
 
@@ -120,8 +141,12 @@ wasserstein2 <- function(p_sample, q_sample, num_bins = 10) {
 }
 
 
-avg_wasserstein2 <- function(dt, synthetic_dt, data_dt, i_ppc, min_i = 100, num_bins = 10) {
+avg_wasserstein2 <- function(dt, synthetic_dt, data_dt, i_ppc, last_epi=FALSE, last_epi_day = NULL, min_i = 100, num_bins = 10) {
   days <- synthetic_dt[i >= min_i, day]
+  if (last_epi) {
+    # compute only for days less than the day when the second epidemic ends
+    days <- days[days <= last_epi_day]
+  }
   samplecols <- paste0("sample", 1:300)
   
   avg_w2_window <- function(w) {
@@ -135,8 +160,15 @@ avg_wasserstein2 <- function(dt, synthetic_dt, data_dt, i_ppc, min_i = 100, num_
     }
     return(data.table(window = w, avg_w2 = mean(tmp_list)))
   }
+  dt_return <- rbindlist(lapply(unique(dt$window), avg_w2_window))
   
-  return(rbindlist(lapply(unique(dt$window), avg_w2_window)))
+  if (last_epi) {
+    names(dt_return)[names(dt_return) == 'avg_w2'] <- 'avg_w2_last_epi_day'
+    return(dt_return)
+  } else {
+    return(dt_return)
+  }
+  
 }
 
 free_sim <- function(beta_dt, synthetic_dt) {
@@ -185,7 +217,7 @@ free_sim <- function(beta_dt, synthetic_dt) {
   return(i_ppc)
 }
 
-data_rmse <- function(dt, synthetic_dt) {
+data_rmse <- function(dt, synthetic_dt, dd=NULL, last_epi=FALSE) {
   # generate i from dt
   synthetic_dt$day <- 1:nrow(synthetic_dt)
   samplecols <- paste0("sample", 1:300)
@@ -197,13 +229,24 @@ data_rmse <- function(dt, synthetic_dt) {
 
   # compute rmse
   i_dt$sqdiff <- rowMeans((i_dt$i - i_dt[, samplecols, with=FALSE])^2)
+  
+  if (last_epi) {
+    return(i_dt[day<=dd, .(data_rmse_last_epi_day=sqrt(mean(sqdiff, na.rm=TRUE))), by=window])
+  }
+  
   return(list(rmse_dt = i_dt[, .(data_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window], i_ppc = i_ppc))
 }
 
-rt_rmse <- function(dt, peaks=NULL) {
+rt_rmse <- function(dt, peaks=NULL, last_epi=FALSE) {
   dt_copy <- copy(dt)
   samplecols <- paste0("sample", 1:300)
   dt_copy$sqdiff <- rowMeans((dt_copy$rt - dt_copy[, samplecols, with=FALSE])^2)
+  
+  if (last_epi) {
+    # compute rmse from day 1 until the last day of the second epidemic
+    return(dt_copy[day<=peaks, .(rt_last_epi_day_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window])
+  }
+  
   if (is.null(peaks)) {
     return(dt_copy[, .(rt_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window])
   } else {
