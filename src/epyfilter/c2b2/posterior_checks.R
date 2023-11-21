@@ -11,6 +11,10 @@ check_param_in_ci <- function(dt, dd, last_epi=FALSE, percentile = 95) {
     if (!is.numeric(dd)) {
       stop("dd must be numeric")
     }
+    if (nrow(dt[day==dd]) < 20) {
+      # day is tooo late
+      dd <- max(dt[window==20, day])
+    }
     percentile_dt <- dt[day==dd, as.list(quantile(.SD, quantiles, na.rm=TRUE)),  .SDcols=paste0("sample", 1:300), by=.(window)]
     truth_dt <- dt[day==dd, .(window, rt)]
     percentile_dt <- merge(percentile_dt, truth_dt, by=c("window"))
@@ -33,6 +37,10 @@ compute_ens_var <- function(dt, dd, last_epi=FALSE) {
   } else {
     if (!is.numeric(dd)) {
       stop("day must be numeric")
+    }
+    if (nrow(dt[day==dd]) < 20) {
+      # day is tooo late
+      dd <- max(dt[window==20, day])
     }
     if (last_epi) {
       return(dt[day==dd, .(ens_var_last_epi_day=rowVars(as.matrix(.SD), na.rm=TRUE)),
