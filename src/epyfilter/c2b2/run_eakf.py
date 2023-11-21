@@ -61,9 +61,11 @@ if __name__ == '__main__':
     else:
         pickle_files = df.iloc[start_row:, 0]
     pickle_files = [f"/ifs/scratch/jls106_gp/nhw2114/data/20231025_synthetic_data/{p}_synthetic_data.pkl" for p in pickle_files]
+    last_epidemic_days_df = pd.read_csv(os.path.join(args.in_dir, "last_epidemic_day.csv"))
 
     for i, pickle_file in enumerate(tqdm(pickle_files)):
         param_num = os.path.basename(pickle_file).split("_")[0]
+        last_epi_day = int(last_epidemic_days_df.loc[last_epidemic_days_df.param==int(param_num), 'last_epidemic_day'].values)
 
         with open(pickle_file, 'rb') as file:
             data = pickle.load(file)
@@ -92,10 +94,31 @@ if __name__ == '__main__':
         peak_days, = np.where(np.diff(np.sign(np.diff(det_data.i_true))) == -2)  # days where it increases before then decreases
         peak_days = peak_days[:2]  # just take first two days
 
-        columns=["method", "rt_peak_rmse", "rt_rmse", "data_rmse","avg_w2","avg_kl","in_ci","ens_var","in_ci_last_day","ens_var_last_day"]
+        columns=["method", "rt_peak_rmse", "rt_rmse", "rt_last_epi_day_rmse", "data_rmse","data_rmse_last_epi_day", "avg_w2","avg_kl","in_ci","ens_var","in_ci_last_day","ens_var_last_day","in_ci_last_epi_day","ens_var_last_epi_day"]
         check_df = pd.DataFrame(columns=columns)
         names = ["percentile","adaptive","adaptive_beta","no","no_beta","fixed","fixed_beta","smooth","smooth_beta"]
         reliability_df = pd.DataFrame(columns=names)
+
+        def compute_posterior_checks(kf, method_name, is_ks=False):
+            kf_checks = pd.DataFrame({
+                'method' : method_name,
+                'rt_peak_rmse'           : posterior_checks.rt_rmse(kf, peaks=peak_days),
+                'rt_rmse'                : posterior_checks.rt_rmse(kf),
+                'rt_last_epi_day_rmse'   : posterior_checks.rt_rmse(kf,True,last_epi_day),
+                'data_rmse'              : posterior_checks.data_rmse(kf),
+                'data_rmse_last_epi_day' : posterior_checks.data_rmse(kf,True, last_epi_day),
+                'avg_w2'                 : (posterior_checks.avg_wasserstein2_ks(kf) if is_ks else posterior_checks.avg_wasserstein2(kf)),
+                'avg_kl'                 : (posterior_checks.avg_kl_divergence_ks(kf) if is_ks else posterior_checks.avg_kl_divergence(kf)),
+                'avg_w2_last_epi_day'    : (posterior_checks.avg_wasserstein2_ks(kf,True,last_epi_day) if is_ks else posterior_checks.avg_wasserstein2(kf,True,last_epi_day)),
+                'avg_kl_last_epi_day'    : (posterior_checks.avg_kl_divergence_ks(kf,True,last_epi_day) if is_ks else posterior_checks.avg_kl_divergence(kf,True,last_epi_day)),
+                'in_ci'                  : (posterior_checks.check_param_in_ci_ks(kf,late_day) if is_ks else posterior_checks.check_param_in_ci(kf,late_day)),
+                'ens_var'                : (posterior_checks.compute_ens_var_ks(kf,late_day) if is_ks else posterior_checks.compute_ens_var(kf,late_day)),
+                'in_ci_last_day'         : (posterior_checks.check_param_in_ci_ks(kf,"last") if is_ks else posterior_checks.check_param_in_ci(kf,"last")),
+                'ens_var_last_day'       : (posterior_checks.compute_ens_var_ks(kf,"last") if is_ks else posterior_checks.compute_ens_var(kf,"last")),
+                'in_ci_last_epi_day'     : (posterior_checks.check_param_in_ci_ks(kf,last_epi_day) if is_ks else posterior_checks.check_param_in_ci(kf,last_epi_day)),
+                'ens_var_last_epi_day'   : (posterior_checks.compute_ens_var_ks(kf,last_epi_day) if is_ks else posterior_checks.compute_ens_var(kf,last_epi_day)),
+            }, index=[0])
+            return kf_checks
 
         for r in range(args.n_real):
             # adaptive inflation 
@@ -110,18 +133,7 @@ if __name__ == '__main__':
                 kf.plot_reliability(path=args.out_dir, name=f"{param_num}_eakf_reliability_adaptive_inflation")
                 kf.plot_ppc(path=args.out_dir, name=f"{param_num}_eakf_ppc_adaptive_inflation")
 
-            kf_checks = pd.DataFrame([
-                ["adaptive inflation",
-                 posterior_checks.rt_rmse(kf, peaks=peak_days),
-                 posterior_checks.rt_rmse(kf),
-                 posterior_checks.data_rmse(kf),
-                 posterior_checks.avg_wasserstein2(kf),
-                 posterior_checks.avg_kl_divergence(kf),
-                 posterior_checks.check_param_in_ci(kf,late_day),
-                 posterior_checks.compute_ens_var(kf,late_day),
-                 posterior_checks.check_param_in_ci(kf,"last"),
-                 posterior_checks.compute_ens_var(kf,"last")]
-                 ], columns=columns)
+            kf_checks = compute_posterior_checks(kf, "adaptive inflation")
             check_df = pd.concat([check_df, kf_checks], ignore_index=True)
 
             # no inflation
@@ -135,18 +147,7 @@ if __name__ == '__main__':
                 kf_no.plot_reliability(path=args.out_dir, name=f"{param_num}_eakf_reliability_no_inflation")
                 kf_no.plot_ppc(path=args.out_dir, name=f"{param_num}_eakf_ppc_no_inflation")
 
-            kf_no_checks = pd.DataFrame([
-                ["no inflation",
-                 posterior_checks.rt_rmse(kf_no, peaks=peak_days),
-                 posterior_checks.rt_rmse(kf_no),
-                 posterior_checks.data_rmse(kf_no),
-                 posterior_checks.avg_wasserstein2(kf_no),
-                 posterior_checks.avg_kl_divergence(kf_no),
-                 posterior_checks.check_param_in_ci(kf_no,late_day),
-                 posterior_checks.compute_ens_var(kf_no,late_day),
-                 posterior_checks.check_param_in_ci(kf_no,"last"),
-                 posterior_checks.compute_ens_var(kf_no,"last")]
-                 ], columns=columns)
+            kf_no_checks = compute_posterior_checks(kf_no, "no inflation")
             check_df = pd.concat([check_df, kf_no_checks], ignore_index=True)
 
             # fixed inflation 
@@ -160,37 +161,15 @@ if __name__ == '__main__':
                 kf_fixed.plot_reliability(path=args.out_dir, name=f"{param_num}_eakf_reliability_fixed_inflation")
                 kf_fixed.plot_ppc(path=args.out_dir, name=f"{param_num}_eakf_ppc_fixed_inflation")
 
-            kf_fixed_checks = pd.DataFrame([
-                ["fixed inflation",
-                posterior_checks.rt_rmse(kf_fixed, peaks=peak_days),
-                posterior_checks.rt_rmse(kf_fixed),
-                posterior_checks.data_rmse(kf_fixed),
-                posterior_checks.avg_wasserstein2(kf_fixed),
-                posterior_checks.avg_kl_divergence(kf_fixed),
-                posterior_checks.check_param_in_ci(kf_fixed,late_day),
-                posterior_checks.compute_ens_var(kf_fixed,late_day),
-                posterior_checks.check_param_in_ci(kf_fixed,"last"),
-                posterior_checks.compute_ens_var(kf_fixed,"last")]
-            ], columns=columns)
+            kf_fixed_checks = compute_posterior_checks(kf_fixed, "fixed inflation")
             check_df = pd.concat([check_df, kf_fixed_checks], ignore_index=True)
 
             ks = enks.EnsembleSquareRootSmoother(kf)
             ks.smooth(window_size=10, plot=False)
             ks.compute_reliability(percentiles)
             ks.compute_beta_reliability(percentiles)
-
-            ks_checks = pd.DataFrame([
-                ["smooth",
-                 posterior_checks.rt_rmse(ks, peaks=peak_days),
-                 posterior_checks.rt_rmse(ks),
-                 posterior_checks.data_rmse(ks),
-                 posterior_checks.avg_wasserstein2_ks(ks),
-                 posterior_checks.avg_kl_divergence_ks(ks),
-                 posterior_checks.check_param_in_ci_ks(ks,late_day),
-                 posterior_checks.compute_ens_var_ks(ks,late_day),
-                 posterior_checks.check_param_in_ci_ks(ks,"last"),
-                 posterior_checks.compute_ens_var_ks(ks,"last")]
-                ], columns=columns)
+            import pdb; pdb.set_trace()
+            ks_checks = compute_posterior_checks(ks, "smooth inflation", is_ks=True)
             check_df = pd.concat([check_df, ks_checks], ignore_index=True)
 
             tmp_df = pd.DataFrame(np.array([
