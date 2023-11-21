@@ -162,7 +162,7 @@ for (file in files) {
     print(plot_list[[i]])
     plot(res_plot_list[[i]])
   }
-  dev.off()p
+  dev.off()
 }
 print("DONE!")
 
