@@ -18,6 +18,7 @@ parser$add_argument("--in-dir", help = "directory for external inputs", default 
 parser$add_argument("--data-dir", help = "directory for synthetic inputs", default = "/ifs/scratch/jls106_gp/nhw2114/data/20231025_synthetic_data/", type = "character")
 parser$add_argument("--out-dir", help = "directory for this steps checks", default = "/ifs/scratch/jls106_gp/nhw2114/data/20231106_synthetic_data/", type = "character")
 parser$add_argument("--files-per-task", help = "number of files per array job", default = 10, type = "integer")
+parser$add_argument("--param-list", nargs='+', help = "rerun for specific params", type = "integer")
 
 args <- parser$parse_args()
 print(args)
@@ -37,6 +38,12 @@ if (end_row < nrow(dt)) {
 } else {
   pickle_files <- dt[start_row:nrow(dt)]
 }
+
+if (length(param_list) != 0) {
+  pickle_files <- dt[param %in% param_list]
+  print(pickle_files)
+}
+
 files <- paste0(data_dir, pickle_files$param, "_for_epiestim.csv")
 
 last_epidemic_days = fread(paste0(in_dir,"last_epidemic_day.csv"))
@@ -155,6 +162,7 @@ for (file in files) {
     print(plot_list[[i]])
     plot(res_plot_list[[i]])
   }
-  dev.off()
+  dev.off()p
 }
+print("DONE!")
 
