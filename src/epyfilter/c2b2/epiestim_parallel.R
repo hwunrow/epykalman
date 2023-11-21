@@ -111,18 +111,18 @@ for (file in files) {
   # 95% CI
   percentile <- 95
   quantiles <- c((1 - percentile/100)/2, 1 - (1 - percentile/100)/2)
-  percentile95_dt <- dt[,as.list(quantile(.SD, quantiles, na.rm=TRUE)),  .SDcols=paste0("sample", 1:300), by=.(day,window)]
+  percentile95_dt <- R_posterior_all_dt[,as.list(quantile(.SD, quantiles, na.rm=TRUE)),  .SDcols=paste0("sample", 1:300), by=.(day,window)]
   # 50% CI
   percentile <- 50
   quantiles <- c((1 - percentile/100)/2, 1 - (1 - percentile/100)/2)
-  percentile50_dt <- dt[,as.list(quantile(.SD, quantiles, na.rm=TRUE)),  .SDcols=paste0("sample", 1:300), by=.(day,window)]
+  percentile50_dt <- R_posterior_all_dt[,as.list(quantile(.SD, quantiles, na.rm=TRUE)),  .SDcols=paste0("sample", 1:300), by=.(day,window)]
   # mean
-  mean_dt <- dt[, .(mean = rowMeans(.SD, na.rm=TRUE)), .SDcols=paste0("sample", 1:300), by=.(day,window)]
+  mean_dt <- R_posterior_all_dt[, .(mean = rowMeans(.SD, na.rm=TRUE)), .SDcols=paste0("sample", 1:300), by=.(day,window)]
   # median
-  med_dt <- dt[, .(med = rowMedians(as.matrix(.SD), na.rm=TRUE)), .SDcols=paste0("sample", 1:300), by=.(day,window)]
+  med_dt <- R_posterior_all_dt[, .(med = rowMedians(as.matrix(.SD), na.rm=TRUE)), .SDcols=paste0("sample", 1:300), by=.(day,window)]
   
   merge_dt <- merge(percentile95_dt, percentile50_dt, by=c("window","day"))
-  merge_dt <- merge(merge_dt, mean_df, by=c("window","day"))
+  merge_dt <- merge(merge_dt, mean_dt, by=c("window","day"))
   merge_dt <- merge(merge_dt, med_dt, by=c("window","day"))
   fwrite(merge_dt, file=paste0(out_dir,"/",param_num, "_epiEstim_for_plot.csv"))
   
