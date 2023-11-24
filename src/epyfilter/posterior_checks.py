@@ -117,7 +117,7 @@ def compute_ens_var_ks(ks, day):
 
 
 def check_param_in_ci_ks(ks, day, percentile=95):
-    post_betas = np.asarray([θ.beta for θ in ks.θ_lag_list])
+    post_betas = np.asarray([θ.beta * θ.t_I for θ in ks.θ_lag_list])
     quantiles = [(1-percentile/100)/2, 1-(1-percentile/100)/2]
     quantiles_beta = np.quantile(post_betas, q=quantiles, axis=1)
     lower = quantiles_beta[0, :]
