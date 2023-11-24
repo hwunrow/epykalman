@@ -6,6 +6,8 @@ import pickle
 import logging
 from tqdm import tqdm
 from epyfilter import model_da, eakf, enks, posterior_checks, simulate_data
+from matplotlib.backends.backend_pdf import PdfPages
+
 
 from numpy.random import uniform
 
@@ -48,6 +50,10 @@ if __name__ == '__main__':
     parser.add_argument(
         "--out-dir", type=str, required=True,
         help="Directory to save plots and files.")
+    parser.add_argument(
+        "--param-list", type=int, nargs="+",
+        help="Rerunning for specific sge_task_ids"
+    )
     args = parser.parse_args()
 
     np.random.seed(1994)
@@ -60,6 +66,11 @@ if __name__ == '__main__':
         pickle_files = df.iloc[start_row:end_row, 0]
     else:
         pickle_files = df.iloc[start_row:, 0]
+    
+    # override if supplied param list
+    if args.param_list:
+        pickle_files = args.param_list
+
     pickle_files = [f"/ifs/scratch/jls106_gp/nhw2114/data/20231025_synthetic_data/{p}_synthetic_data.pkl" for p in pickle_files]
     last_epidemic_days_df = pd.read_csv(os.path.join(args.in_dir, "last_epidemic_day.csv"))
 
@@ -128,11 +139,6 @@ if __name__ == '__main__':
             kf.compute_reliability(percentiles)
             kf.compute_beta_reliability(percentiles)
 
-            if r == 0:
-                kf.plot_posterior(path=args.out_dir, name=f"{param_num}_eakf_posterior_adaptive_inflation")
-                kf.plot_reliability(path=args.out_dir, name=f"{param_num}_eakf_reliability_adaptive_inflation")
-                kf.plot_ppc(path=args.out_dir, name=f"{param_num}_eakf_ppc_adaptive_inflation")
-
             kf_checks = compute_posterior_checks(kf, "adaptive inflation")
             check_df = pd.concat([check_df, kf_checks], ignore_index=True)
 
@@ -141,11 +147,6 @@ if __name__ == '__main__':
             kf_no.filter(prior, inf_method="none")
             kf_no.compute_reliability(percentiles)
             kf_no.compute_beta_reliability(percentiles)
-
-            if r == 0:
-                kf_no.plot_posterior(path=args.out_dir, name=f"{param_num}_eakf_posterior_no_inflation")
-                kf_no.plot_reliability(path=args.out_dir, name=f"{param_num}_eakf_reliability_no_inflation")
-                kf_no.plot_ppc(path=args.out_dir, name=f"{param_num}_eakf_ppc_no_inflation")
 
             kf_no_checks = compute_posterior_checks(kf_no, "no inflation")
             check_df = pd.concat([check_df, kf_no_checks], ignore_index=True)
@@ -156,11 +157,6 @@ if __name__ == '__main__':
             kf_fixed.compute_reliability(percentiles)
             kf_fixed.compute_beta_reliability(percentiles)
 
-            if r == 0:
-                kf_fixed.plot_posterior(path=args.out_dir, name=f"{param_num}_eakf_posterior_fixed_inflation")
-                kf_fixed.plot_reliability(path=args.out_dir, name=f"{param_num}_eakf_reliability_fixed_inflation")
-                kf_fixed.plot_ppc(path=args.out_dir, name=f"{param_num}_eakf_ppc_fixed_inflation")
-
             kf_fixed_checks = compute_posterior_checks(kf_fixed, "fixed inflation")
             check_df = pd.concat([check_df, kf_fixed_checks], ignore_index=True)
 
@@ -168,10 +164,36 @@ if __name__ == '__main__':
             ks.smooth(window_size=10, plot=False)
             ks.compute_reliability(percentiles)
             ks.compute_beta_reliability(percentiles)
-            import pdb; pdb.set_trace()
+
             ks_checks = compute_posterior_checks(ks, "smooth inflation", is_ks=True)
             check_df = pd.concat([check_df, ks_checks], ignore_index=True)
 
+            if r == 0:
+                pdf_file = args.out_dir + f"/{param_num}_eakf_plots.pdf"
+
+                f1 = kf.plot_posterior(path=args.out_dir, name=f"{param_num}_eakf_posterior_adaptive_inflation")
+                f2 = kf.plot_reliability(path=args.out_dir, name=f"{param_num}_eakf_reliability_adaptive_inflation")
+                f3 = kf.plot_ppc(path=args.out_dir, name=f"{param_num}_eakf_ppc_adaptive_inflation")
+
+                f4 = kf_no.plot_posterior(path=args.out_dir, name=f"{param_num}_eakf_posterior_no_inflation")
+                f5 = kf_no.plot_reliability(path=args.out_dir, name=f"{param_num}_eakf_reliability_no_inflation")
+                f6 = kf_no.plot_ppc(path=args.out_dir, name=f"{param_num}_eakf_ppc_no_inflation")
+
+                f7 = kf_fixed.plot_posterior(path=args.out_dir, name=f"{param_num}_eakf_posterior_fixed_inflation")
+                f8 = kf_fixed.plot_reliability(path=args.out_dir, name=f"{param_num}_eakf_reliability_fixed_inflation")
+                f9 = kf_fixed.plot_ppc(path=args.out_dir, name=f"{param_num}_eakf_ppc_fixed_inflation")
+
+                with PdfPages(pdf_file) as pdf:
+                    pdf.savefig(f1)
+                    pdf.savefig(f2)
+                    pdf.savefig(f3)
+                    pdf.savefig(f4)
+                    pdf.savefig(f5)
+                    pdf.savefig(f6)
+                    pdf.savefig(f7)
+                    pdf.savefig(f8)
+                    pdf.savefig(f9)
+                
             tmp_df = pd.DataFrame(np.array([
                 percentiles,
                 kf.prop_list, kf.beta_prop_list,
@@ -181,9 +203,11 @@ if __name__ == '__main__':
                 columns=names)
             reliability_df = pd.concat([reliability_df, tmp_df], ignore_index=True)
         
-        reliability_df = reliability_df.groupby("percentile").mean()
-        reliability_df.to_csv(f"{args.out_dir}/{param_num}_reliability.csv", index=True)
+        # reliability_df = reliability_df.groupby("percentile").mean()
+        # reliability_df.to_csv(f"{args.out_dir}/{param_num}_reliability.csv", index=True)
 
         check_df = check_df.groupby("method").mean()
         check_df.to_csv(f"{args.out_dir}/{param_num}_eakf_metrics.csv", index=True)
         logger.info(f"{param_num} saved csv")
+
+logger.info("DONE")
