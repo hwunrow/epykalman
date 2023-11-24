@@ -6,11 +6,16 @@ def check_param_in_ci(kf, day, percentile=95):
     quantiles_beta = np.quantile(post_betas, q=quantiles, axis=1)
     lower = quantiles_beta[0, :]
     upper = quantiles_beta[1, :]
+
     if day == "last":
         return lower[-1] <= kf.data.beta[-1] * kf.data.t_I <= upper[-1]
     else:
         assert isinstance(day, int), "day must be integer"
-        return lower[day] <= kf.data.beta[day] * kf.data.t_I <= upper[day]
+        if day >= len(kf.data.beta):
+            # day is past the end of the time series
+            return lower[-1] <= kf.data.beta[-1] * kf.data.t_I <= upper[-1]
+        else:
+            return lower[day] <= kf.data.beta[day] * kf.data.t_I <= upper[day]
 
 
 def compute_ens_var(kf, day):
@@ -18,7 +23,11 @@ def compute_ens_var(kf, day):
         return np.var(np.asarray([θ.beta * θ.t_I for θ in kf.θ_list])[-1])
     else:
         assert isinstance(day, int), "day must be integer"
-        return np.var(np.asarray([θ.beta * θ.t_I for θ in kf.θ_list])[day])
+        if day >= len(kf.θ_list):
+            # day is past the end of the time series
+            return np.var(np.asarray([θ.beta * θ.t_I for θ in kf.θ_list])[-1])
+        else:
+            return np.var(np.asarray([θ.beta * θ.t_I for θ in kf.θ_list])[day])
 
 
 def avg_kl_divergence(kf,  last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
@@ -102,6 +111,8 @@ def compute_ens_var_ks(ks, day):
         return np.var(np.asarray([θ.beta * θ.t_I for θ in ks.θ_lag_list])[-1])
     else:
         assert isinstance(day, int), "day must be integer"
+        if day > len(ks.θ_lag_list):
+            day = len(ks.θ_lag_list) - 1
         return np.var(np.asarray([θ.beta * θ.t_I for θ in ks.θ_lag_list])[day])
 
 
@@ -115,7 +126,8 @@ def check_param_in_ci_ks(ks, day, percentile=95):
         return lower[-1] <= ks.data.beta[-1] * ks.data.t_I <= upper[-1]
     else:
         assert isinstance(day, int), "day must be integer"
-        assert day < len(ks.θ_lag_list)
+        if day > len(ks.θ_lag_list):
+            day = len(ks.θ_lag_list) - 1
         return lower[day] <= ks.data.beta[day] * ks.data.t_I <= upper[day]
 
 
@@ -187,7 +199,12 @@ def rt_rmse(kf, last_epi=False, peaks=None):
     if last_epi:
         # compute rmse from day 1 until the last day of the second epidemic
         rt_kf = np.array([θ.beta * θ.t_I for θ in kf.θ_list])
-        rmse = np.sqrt(np.mean((rt_kf[:peaks].T - kf.data.rt[:peaks])**2, axis=0))
+        if peaks > rt_kf.shape[1]:
+            # last epi day is past the end of the time series
+            last_day = rt_kf.shape[1]
+            rmse = np.sqrt(np.mean((rt_kf[:last_day].T - kf.data.rt[:last_day])**2, axis=0))
+        else:
+            rmse = np.sqrt(np.mean((rt_kf[:peaks].T - kf.data.rt[:peaks])**2, axis=0))
         return(np.mean(rmse))
 
     if peaks is not None:
