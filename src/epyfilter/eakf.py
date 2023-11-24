@@ -298,8 +298,7 @@ class EnsembleAdjustmentKalmanFilter():
 
         # for p in percentiles:
         #     S, Ir, R, i = self.free_sim(np.quantile(betas_skip, q=p/100))
-        if path:
-            plt.savefig(f'{path}/{name}.pdf')
+        return fig
 
     def plot_posterior(self, path=None, name='eakf_posterior'):
         fig, ax = plt.subplots(3)
@@ -342,8 +341,7 @@ class EnsembleAdjustmentKalmanFilter():
 
         fig.suptitle(f'EAKF full time series {name}')
 
-        if path:
-            plt.savefig(f'{path}/{name}.pdf')
+        return fig
 
     def plot_ppc(self, path=None, name='eakf_ppc'):
         fig, ax = plt.subplots(3)
@@ -360,5 +358,4 @@ class EnsembleAdjustmentKalmanFilter():
         ax[1].plot(self.data.data_distribution, color="gray", alpha=0.01)
         ax[2].plot(self.i_ppc, color="blue", alpha=0.01)
 
-        if path:
-            plt.savefig(f'{path}/{name}.pdf')
+        return fig
