@@ -144,6 +144,7 @@ if __name__ == '__main__':
 
             kf_checks = compute_posterior_checks(kf, "adaptive inflation")
             check_df = pd.concat([check_df, kf_checks], ignore_index=True)
+            kf.save_data(path=args.out_dir, name=f'{param_num}_adaptive_inflation_run_{r}')
 
             # no inflation
             kf_no = eakf.EnsembleAdjustmentKalmanFilter(model, m=args.n_ens)
@@ -153,6 +154,7 @@ if __name__ == '__main__':
 
             kf_no_checks = compute_posterior_checks(kf_no, "no inflation")
             check_df = pd.concat([check_df, kf_no_checks], ignore_index=True)
+            kf_no.save_data(path=args.out_dir, name=f'{param_num}_no_inflation_run_{r}')
 
             # fixed inflation 
             kf_fixed = eakf.EnsembleAdjustmentKalmanFilter(model, m=args.n_ens)
@@ -162,6 +164,7 @@ if __name__ == '__main__':
 
             kf_fixed_checks = compute_posterior_checks(kf_fixed, "fixed inflation")
             check_df = pd.concat([check_df, kf_fixed_checks], ignore_index=True)
+            kf_fixed.save_data(path=args.out_dir, name=f'{param_num}_fixed_inflation_run_{r}')
 
             ks = enks.EnsembleSquareRootSmoother(kf)
             ks.smooth(window_size=10, plot=False)
@@ -170,6 +173,7 @@ if __name__ == '__main__':
 
             ks_checks = compute_posterior_checks(ks, "smooth inflation", is_ks=True)
             check_df = pd.concat([check_df, ks_checks], ignore_index=True)
+            ks.save_data(path=args.out_dir, name=f'{param_num}_smooth_inflation_run_{r}')
 
             if r == 0:
                 pdf_file = args.out_dir + f"/{param_num}_eakf_plots.pdf"
