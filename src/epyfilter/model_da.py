@@ -4,12 +4,13 @@ import collections
 
 class SIR_model():
     SIR = collections.namedtuple(
-        typename='SIRComponents',
+        typename='SIR',
         field_names=[
             'S',
             'I',
             'R',
             'i'])
+    SIR.__qualname__ = 'SIR_model.SIR'
 
     ModelParams = collections.namedtuple(
         typename='ModelParams',
@@ -18,6 +19,7 @@ class SIR_model():
             't_I'  # t_I = 1/gamma
         ]
     )
+    ModelParams.__qualname__ = 'SIR_model.ModelParams'
 
     def __init__(self, data):
         """
