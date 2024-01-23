@@ -1,6 +1,7 @@
 import numpy as np
 from epyfilter import inflation
 import matplotlib.pyplot as plt
+import pickle
 
 tol = 1e-16
 
@@ -359,3 +360,7 @@ class EnsembleAdjustmentKalmanFilter():
         ax[2].plot(self.i_ppc, color="blue", alpha=0.01)
 
         return fig
+
+    def save_data(self, path=None, name='eakf'):
+        with open(f'{path}/{name}.pkl', 'wb') as file:
+            pickle.dump(self, file, pickle.HIGHEST_PROTOCOL)

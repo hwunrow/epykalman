@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
+import pickle
 
 class EnsembleSquareRootSmoother:
     def __init__(self, eakf):
@@ -306,3 +306,7 @@ class EnsembleSquareRootSmoother:
         self.i_ppc = i
 
         return S, Ir, R, i
+
+    def save_data(self, path=None, name='enks'):
+        with open(f'{path}/{name}.pkl', 'wb') as file:
+            pickle.dump(self, file, pickle.HIGHEST_PROTOCOL)
