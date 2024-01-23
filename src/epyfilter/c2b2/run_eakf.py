@@ -48,6 +48,9 @@ if __name__ == '__main__':
         "--in-dir", type=str, required=True,
         help="Directory for inputs.")
     parser.add_argument(
+        "--pkl-dir", type=str, required=True,
+        help="Directory for synthetic data inputs.")
+    parser.add_argument(
         "--out-dir", type=str, required=True,
         help="Directory to save plots and files.")
     parser.add_argument(
@@ -71,7 +74,7 @@ if __name__ == '__main__':
     if args.param_list:
         pickle_files = args.param_list
 
-    pickle_files = [f"/ifs/scratch/jls106_gp/nhw2114/data/20231025_synthetic_data/{p}_synthetic_data.pkl" for p in pickle_files]
+    pickle_files = [os.path.join(args.pkl_dir, f"{p}_synthetic_data.pkl") for p in pickle_files]
     last_epidemic_days_df = pd.read_csv(os.path.join(args.in_dir, "last_epidemic_day.csv"))
 
     for i, pickle_file in enumerate(tqdm(pickle_files)):
