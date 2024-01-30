@@ -83,16 +83,16 @@ if __name__ == "__main__":
     else:
         pickle_files = df.iloc[start_row:, 0]
 
-    # override if supplied param list
-    if args.param_list:
-        pickle_files = [
-            f"/ifs/scratch/jls106_gp/nhw2114/data/example_plots_for_paper/{pp}_synthetic_data.pkl"
-            for pp in args.param_list
-        ]
-
     pickle_files = [
         os.path.join(args.pkl_dir, f"{p}_synthetic_data.pkl") for p in pickle_files
     ]
+    # override if supplied param list
+    if args.param_list:
+        pickle_files = [
+            os.path.join(args.pkl_dir, f"{pp}_synthetic_data.pkl")
+            for pp in args.param_list
+        ]
+
     last_epidemic_days_df = pd.read_csv(
         os.path.join(args.in_dir, "last_epidemic_day.csv")
     )
