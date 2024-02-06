@@ -29,10 +29,21 @@ def compute_peaks(data):
 
 
 def compute_last_epi_day(data):
-    if len(np.where(data.i_true == 0)[0]) == 1:
+    zero_days = np.where(data.i_true == 0)[0]
+    if len(zero_days) == 1:  # never reached 0
         last_epi_day = len(data.i_true)
     else:
-        last_epi_day = np.where(data.i_true == 0)[0][1]
+        first_zero_day = zero_days[1]
+        non_zero_days = np.where(data.i_true > 10)[0]
+        if np.any(non_zero_days > first_zero_day):
+            last_days = zero_days[zero_days > np.max(non_zero_days)]
+            if len(last_days) == 0:
+                last_epi_day = len(data.i_true)
+            else:
+                last_epi_day = last_days[0]
+        else:
+            last_epi_day = first_zero_day
+
     return last_epi_day
 
 
