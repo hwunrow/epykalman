@@ -371,7 +371,7 @@ if __name__ == "__main__":
 
             tmp_df = pd.DataFrame.from_dict(
                 {
-                    'percentiles'   : percentiles,
+                    'percentile'   : percentiles,
                     'adaptive'      : kf.prop_list,
                     'adaptive_beta' : kf.beta_prop_list,
                     'no'            : kf_no.prop_list,
