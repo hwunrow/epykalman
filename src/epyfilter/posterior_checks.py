@@ -39,7 +39,10 @@ def avg_kl_divergence(kf,  last_epi=False, last_epi_day=None, min_i=100, num_bin
     days = np.where(kf.data.i_true >= min_i)[0]
     if last_epi:
         # compute only for days less than the day when the second epidemic ends
+        assert isinstance(last_epi_day, int), "peaks must be integer"
+        last_epi_day = min(last_epi_day, kf.data.n_t-1)
         days = days[days <= last_epi_day]
+
     for t in days:
         # Calculate KL divergence
         kl = kl_divergence(kf.data.data_distribution[t, :],
@@ -57,7 +60,10 @@ def avg_wasserstein2(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins=
     days = np.where(kf.data.i_true >= min_i)[0]
     if last_epi:
         # compute only for days less than the day when the second epidemic ends
+        assert isinstance(last_epi_day, int), "peaks must be integer"
+        last_epi_day = min(last_epi_day, kf.data.n_t-1)
         days = days[days <= last_epi_day]
+
     for t in days:
         # Calculate w2
         w2 = wasserstein2(kf.data.data_distribution[t, :],
@@ -77,6 +83,8 @@ def avg_kl_divergence_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_b
     days = days[days < len(ks.θ_lag_list)]
     if last_epi:
         # compute only for days less than the day when the second epidemic ends
+        assert isinstance(last_epi_day, int), "peaks must be integer"
+        last_epi_day = min(last_epi_day, ks.data.n_t-1)
         days = days[days <= last_epi_day]
     for t in days:
         # Calculate KL divergence
@@ -96,6 +104,8 @@ def avg_wasserstein2_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_bi
     days = days[days < len(ks.θ_lag_list)]
     if last_epi:
         # compute only for days less than the day when the second epidemic ends
+        assert isinstance(last_epi_day, int), "peaks must be integer"
+        last_epi_day = min(last_epi_day, ks.data.n_t-1)
         days = days[days <= last_epi_day]
     for t in days:
         # Calculate w2
@@ -196,33 +206,28 @@ def data_rmse(kf, last_epi_day=None, last_epi=False):
     return np.mean(rmse)
 
 def rt_rmse(kf, last_epi=False, peaks=None):
+    rt_kf = np.array([θ.beta * θ.t_I for θ in kf.θ_list])
+
     if last_epi:
         # compute rmse from day 1 until the last day of the second epidemic
-        rt_kf = np.array([θ.beta * θ.t_I for θ in kf.θ_list])
-        if peaks > rt_kf.shape[1]:
-            # last epi day is past the end of the time series
-            last_day = rt_kf.shape[1]
-            rmse = np.sqrt(np.mean((rt_kf[:last_day].T - kf.data.rt[:last_day])**2, axis=0))
+        assert isinstance(peaks, int), "peaks must be integer"
+        peaks = min(peaks, kf.data.n_t-1)
+
+        rmse = np.sqrt(np.mean((rt_kf[:peaks].T - kf.data.rt[:peaks])**2, axis=0))
+        return np.mean(rmse)
+    elif peaks is not None:
+        # computes rmse on specific day(s)
+        if isinstance(peaks, list):
+            peaks = [min(p, kf.data.n_t-1) for p in peaks]
+        elif isinstance(peaks, int):
+            peaks = min(peaks, kf.data.n_t-1)
         else:
-            rmse = np.sqrt(np.mean((rt_kf[:peaks].T - kf.data.rt[:peaks])**2, axis=0))
-        return(np.mean(rmse))
-
-    if peaks is not None:
-        rt_kf = np.array([θ.beta * θ.t_I for θ in kf.θ_list])
-        try:
-            rmse = np.sqrt(np.mean((rt_kf[peaks].T - kf.data.rt[peaks])**2, axis=0))
-            try:
-                peak = peaks[0]
-                rmse = np.sqrt(np.mean((rt_kf[peak].T - kf.data.rt[peak])**2, axis=0))
-            except IndexError as ve:
-                print(f"ValueError: {ve}. Please enter a valid number.")
-                return np.nan
-        except IndexError as ve:
-            print(f"ValueError: {ve}. Please enter a valid number.")
-            return np.nan
-
+            raise ValueError("peaks must be a list or an integer")
+        
+        rmse = np.sqrt(np.mean((rt_kf[peaks].T - kf.data.rt[peaks])**2, axis=0))
+        return np.mean(rmse)
     else:
-        rt_kf = np.array([θ.beta * θ.t_I for θ in kf.θ_list])
+        # computes rmse for entire time series
         rmse = np.sqrt(np.mean((rt_kf.T - kf.data.rt[:len(rt_kf)])**2, axis=0))
 
     return np.mean(rmse)

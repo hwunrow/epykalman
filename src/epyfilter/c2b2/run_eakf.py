@@ -12,6 +12,111 @@ from matplotlib.backends.backend_pdf import PdfPages
 from numpy.random import uniform
 
 
+def compute_posterior_checks(kf, method_name, is_ks=False):
+            kf_checks = pd.DataFrame(
+                {
+                    "method": method_name,
+                    # "rt_peak_rmse": posterior_checks.rt_rmse(kf, peaks=peak_days),
+                    # "rt_rmse": posterior_checks.rt_rmse(kf),
+                    "rt_rmse_last_epi_day": posterior_checks.rt_rmse(
+                        kf, True, last_epi_day
+                    ),
+                    "rt_rmse_before_last_epi_day": posterior_checks.rt_rmse(
+                        kf, True, last_epi_day - 1
+                    ),
+                    "rt_rmse_after_last_epi_day": posterior_checks.rt_rmse(
+                        kf, True, last_epi_day + 1
+                    ),
+                    # "data_rmse": posterior_checks.data_rmse(kf),
+                    # "data_rmse_last_epi_day": posterior_checks.data_rmse(
+                    #     kf, True, last_epi_day
+                    # ),
+                    # "avg_w2": (
+                    #     posterior_checks.avg_wasserstein2_ks(kf)
+                    #     if is_ks
+                    #     else posterior_checks.avg_wasserstein2(kf)
+                    # ),
+                    # "avg_kl": (
+                    #     posterior_checks.avg_kl_divergence_ks(kf)
+                    #     if is_ks
+                    #     else posterior_checks.avg_kl_divergence(kf)
+                    # ),
+                    "avg_w2_last_epi_day": (
+                        posterior_checks.avg_wasserstein2_ks(kf, True, last_epi_day)
+                        if is_ks
+                        else posterior_checks.avg_wasserstein2(kf, True, last_epi_day)
+                    ),
+                    "avg_w2_before_last_epi_day": (
+                        posterior_checks.avg_wasserstein2_ks(kf, True, last_epi_day - 1)
+                        if is_ks
+                        else posterior_checks.avg_wasserstein2(kf, True, last_epi_day - 1)
+                    ),
+                    "avg_w2_after_last_epi_day": (
+                        posterior_checks.avg_wasserstein2_ks(kf, True, last_epi_day + 1)
+                        if is_ks
+                        else posterior_checks.avg_wasserstein2(kf, True, last_epi_day + 1)
+                    ),
+                    "avg_kl_last_epi_day": (
+                        posterior_checks.avg_kl_divergence_ks(kf, True, last_epi_day)
+                        if is_ks
+                        else posterior_checks.avg_kl_divergence(kf, True, last_epi_day)
+                    ),
+                    "avg_kl_before_last_epi_day": (
+                        posterior_checks.avg_kl_divergence_ks(kf, True, last_epi_day - 1)
+                        if is_ks
+                        else posterior_checks.avg_kl_divergence(kf, True, last_epi_day - 1)
+                    ),
+                    "avg_kl_after_last_epi_day": (
+                        posterior_checks.avg_kl_divergence_ks(kf, True, last_epi_day + 1)
+                        if is_ks
+                        else posterior_checks.avg_kl_divergence(kf, True, last_epi_day + 1)
+                    ),
+                    # "in_ci": (
+                    #     posterior_checks.check_param_in_ci_ks(kf, late_day)
+                    #     if is_ks
+                    #     else posterior_checks.check_param_in_ci(kf, late_day)
+                    # ),
+                    # "ens_var": (
+                    #     posterior_checks.compute_ens_var_ks(kf, late_day)
+                    #     if is_ks
+                    #     else posterior_checks.compute_ens_var(kf, late_day)
+                    # ),
+                    # "in_ci_last_day": (
+                    #     posterior_checks.check_param_in_ci_ks(kf, "last")
+                    #     if is_ks
+                    #     else posterior_checks.check_param_in_ci(kf, "last")
+                    # ),
+                    # "ens_var_last_day": (
+                    #     posterior_checks.compute_ens_var_ks(kf, "last")
+                    #     if is_ks
+                    #     else posterior_checks.compute_ens_var(kf, "last")
+                    # ),
+                    "in_ci_last_epi_day": (
+                        posterior_checks.check_param_in_ci_ks(kf, last_epi_day)
+                        if is_ks
+                        else posterior_checks.check_param_in_ci(kf, last_epi_day)
+                    ),
+                    "in_ci_before_last_epi_day": (
+                        posterior_checks.check_param_in_ci_ks(kf, last_epi_day - 1)
+                        if is_ks
+                        else posterior_checks.check_param_in_ci(kf, last_epi_day - 1)
+                    ),
+                    "in_ci_after_last_epi_day": (
+                        posterior_checks.check_param_in_ci_ks(kf, last_epi_day + 1)
+                        if is_ks
+                        else posterior_checks.check_param_in_ci(kf, last_epi_day + 1)
+                    ),
+                    # "ens_var_last_epi_day": (
+                    #     posterior_checks.compute_ens_var_ks(kf, last_epi_day)
+                    #     if is_ks
+                    #     else posterior_checks.compute_ens_var(kf, last_epi_day)
+                    # ),
+                },
+                index=[0],
+            )
+            return kf_checks
+
+
 if __name__ == "__main__":
     try:
         sge_task_id = int(os.environ.get("SGE_TASK_ID"))
@@ -94,14 +199,14 @@ if __name__ == "__main__":
         ]
 
     last_epidemic_days_df = pd.read_csv(
-        os.path.join(args.in_dir, "last_epidemic_day.csv")
+        os.path.join(args.in_dir, "compute_days.csv")
     )
 
     for i, pickle_file in enumerate(tqdm(pickle_files)):
         param_num = os.path.basename(pickle_file).split("_")[0]
         last_epi_day = int(
             last_epidemic_days_df.loc[
-                last_epidemic_days_df.param == int(param_num), "last_epidemic_day"
+                last_epidemic_days_df.param == int(param_num), "last_epi_day"
             ].values
         )
 
@@ -123,119 +228,24 @@ if __name__ == "__main__":
             },
         }
 
-        beta_1 = data.rt_1 / data.t_I
-        beta_0 = data.rt_0 / data.t_I
-        late_day = (
-            -1 / data.k * np.log((beta_1 - beta_0) / (0.99 * beta_1 - beta_0) - 1)
-            + data.midpoint
-        )
-        late_day = int(late_day)
+        # beta_1 = data.rt_1 / data.t_I
+        # beta_0 = data.rt_0 / data.t_I
+        # late_day = (
+        #     -1 / data.k * np.log((beta_1 - beta_0) / (0.99 * beta_1 - beta_0) - 1)
+        #     + data.midpoint
+        # )
+        # late_day = int(late_day)
 
-        det_data = simulate_data.simulate_data(
-            **data.true_params, run_deterministic=True
-        )
-        (peak_days,) = np.where(
-            np.diff(np.sign(np.diff(det_data.i_true))) == -2
-        )  # days where it increases before then decreases
-        peak_days = peak_days[:2]  # just take first two days
+        # det_data = simulate_data.simulate_data(
+        #     **data.true_params, run_deterministic=True
+        # )
+        # (peak_days,) = np.where(
+        #     np.diff(np.sign(np.diff(det_data.i_true))) == -2
+        # )  # days where it increases before then decreases
+        # peak_days = peak_days[:2]  # just take first two days
 
-        columns = [
-            "method",
-            "rt_peak_rmse",
-            "rt_rmse",
-            "rt_last_epi_day_rmse",
-            "data_rmse",
-            "data_rmse_last_epi_day",
-            "avg_w2",
-            "avg_kl",
-            "in_ci",
-            "ens_var",
-            "in_ci_last_day",
-            "ens_var_last_day",
-            "in_ci_last_epi_day",
-            "ens_var_last_epi_day",
-        ]
-        check_df = pd.DataFrame(columns=columns)
-        names = [
-            "percentile",
-            "adaptive",
-            "adaptive_beta",
-            "no",
-            "no_beta",
-            "fixed",
-            "fixed_beta",
-            "smooth",
-            "smooth_beta",
-        ]
-        reliability_df = pd.DataFrame(columns=names)
-
-        def compute_posterior_checks(kf, method_name, is_ks=False):
-            kf_checks = pd.DataFrame(
-                {
-                    "method": method_name,
-                    "rt_peak_rmse": posterior_checks.rt_rmse(kf, peaks=peak_days),
-                    "rt_rmse": posterior_checks.rt_rmse(kf),
-                    "rt_last_epi_day_rmse": posterior_checks.rt_rmse(
-                        kf, True, last_epi_day
-                    ),
-                    "data_rmse": posterior_checks.data_rmse(kf),
-                    "data_rmse_last_epi_day": posterior_checks.data_rmse(
-                        kf, True, last_epi_day
-                    ),
-                    "avg_w2": (
-                        posterior_checks.avg_wasserstein2_ks(kf)
-                        if is_ks
-                        else posterior_checks.avg_wasserstein2(kf)
-                    ),
-                    "avg_kl": (
-                        posterior_checks.avg_kl_divergence_ks(kf)
-                        if is_ks
-                        else posterior_checks.avg_kl_divergence(kf)
-                    ),
-                    "avg_w2_last_epi_day": (
-                        posterior_checks.avg_wasserstein2_ks(kf, True, last_epi_day)
-                        if is_ks
-                        else posterior_checks.avg_wasserstein2(kf, True, last_epi_day)
-                    ),
-                    "avg_kl_last_epi_day": (
-                        posterior_checks.avg_kl_divergence_ks(kf, True, last_epi_day)
-                        if is_ks
-                        else posterior_checks.avg_kl_divergence(kf, True, last_epi_day)
-                    ),
-                    "in_ci": (
-                        posterior_checks.check_param_in_ci_ks(kf, late_day)
-                        if is_ks
-                        else posterior_checks.check_param_in_ci(kf, late_day)
-                    ),
-                    "ens_var": (
-                        posterior_checks.compute_ens_var_ks(kf, late_day)
-                        if is_ks
-                        else posterior_checks.compute_ens_var(kf, late_day)
-                    ),
-                    "in_ci_last_day": (
-                        posterior_checks.check_param_in_ci_ks(kf, "last")
-                        if is_ks
-                        else posterior_checks.check_param_in_ci(kf, "last")
-                    ),
-                    "ens_var_last_day": (
-                        posterior_checks.compute_ens_var_ks(kf, "last")
-                        if is_ks
-                        else posterior_checks.compute_ens_var(kf, "last")
-                    ),
-                    "in_ci_last_epi_day": (
-                        posterior_checks.check_param_in_ci_ks(kf, last_epi_day)
-                        if is_ks
-                        else posterior_checks.check_param_in_ci(kf, last_epi_day)
-                    ),
-                    "ens_var_last_epi_day": (
-                        posterior_checks.compute_ens_var_ks(kf, last_epi_day)
-                        if is_ks
-                        else posterior_checks.compute_ens_var(kf, last_epi_day)
-                    ),
-                },
-                index=[0],
-            )
-            return kf_checks
+        reliability_df = pd.DataFrame()
+        check_df = pd.DataFrame()
 
         for r in range(args.n_real):
             # adaptive inflation
