@@ -1,5 +1,5 @@
 #!/bin/bash
-#$ -l mem=20G,time=15:: -S /bin/bash -N eakf -t 1-958
+#$ -l mem=5G,time=15:: -S /bin/bash -N eakf -t 1-958
 #$ -e /ifs/scratch/jls106_gp/nhw2114/data/20240212_run
 #$ -o /ifs/scratch/jls106_gp/nhw2114/data/20240212_run
 source ~/.bashrc
