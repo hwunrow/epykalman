@@ -244,7 +244,7 @@ if __name__ == "__main__":
 
     np.random.seed(1994)
 
-    files_per_task = 10
+    files_per_task = 50
     df = pd.read_csv(os.path.join(args.in_dir, "good_param_list.csv"))
     start_row = (sge_task_id - 1) * files_per_task
     end_row = sge_task_id * files_per_task
@@ -272,7 +272,7 @@ if __name__ == "__main__":
         last_epi_day = int(
             last_epidemic_days_df.loc[
                 last_epidemic_days_df.param == int(param_num), "last_epi_day"
-            ].values
+            ].values[0]
         )
 
         with open(pickle_file, "rb") as file:
@@ -382,7 +382,7 @@ if __name__ == "__main__":
                     'smooth_beta'   : ks.beta_prop_list,
                 }
             )
-            import pdb; pdb.set_trace()
+
             reliability_df = pd.concat([reliability_df, tmp_df], ignore_index=True)
 
         if args.save_reliability:
