@@ -1,8 +1,21 @@
 import numpy as np
 
+
 def check_param_in_ci(kf, day, percentile=95):
+    """
+    Check if the parameter estimate falls within the credible interval.
+
+    Args:
+        kf (object): The EnsembleAdjustmentKalmanFilter object.
+        day (int or str): The day for which to check the parameter estimate.
+                          If "last", checks the last day.
+        percentile (float, optional): The percentile for credible interval. Default is 95.
+
+    Returns:
+        bool: True if the parameter estimate is within the credible interval, False otherwise.
+    """
     post_betas = np.asarray([θ.beta * θ.t_I for θ in kf.θ_list])
-    quantiles = [(1-percentile/100)/2, 1-(1-percentile/100)/2]
+    quantiles = [(1 - percentile / 100) / 2, 1 - (1 - percentile / 100) / 2]
     quantiles_beta = np.quantile(post_betas, q=quantiles, axis=1)
     lower = quantiles_beta[0, :]
     upper = quantiles_beta[1, :]
@@ -19,6 +32,17 @@ def check_param_in_ci(kf, day, percentile=95):
 
 
 def compute_ens_var(kf, day):
+    """
+    Compute the ensemble variance of parameter estimates.
+
+    Args:
+        kf (object): The EnsembleAdjustmentKalmanFilter object.
+        day (int or str): The day for which to compute the ensemble variance.
+                          If "last", computes for the last day.
+
+    Returns:
+        float: The ensemble variance.
+    """
     if day == "last":
         return np.var(np.asarray([θ.beta * θ.t_I for θ in kf.θ_list])[-1])
     else:
@@ -30,7 +54,20 @@ def compute_ens_var(kf, day):
             return np.var(np.asarray([θ.beta * θ.t_I for θ in kf.θ_list])[day])
 
 
-def avg_kl_divergence(kf,  last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
+def avg_kl_divergence(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
+    """
+    Compute the average Kullback-Leibler divergence.
+
+    Args:
+        kf (object): The EnsembleAdjustmentKalmanFilter object.
+        last_epi (bool, optional): If True, computes only for days up to last_epi_day.
+        last_epi_day (int, optional): Last day of the second epidemic. Defaults to None.
+        min_i (int, optional): Minimum number of infected individuals to consider. Defaults to 100.
+        num_bins (int, optional): Number of bins for histogram. Defaults to 10.
+
+    Returns:
+        float: The average Kullback-Leibler divergence.
+    """
     if not hasattr(kf, "i_ppc"):
         betas = np.asarray([θ.beta for θ in kf.θ_list])
         _, _, _, _ = kf.free_sim(betas)
@@ -42,14 +79,27 @@ def avg_kl_divergence(kf,  last_epi=False, last_epi_day=None, min_i=100, num_bin
         days = days[days <= last_epi_day]
     for t in days:
         # Calculate KL divergence
-        kl = kl_divergence(kf.data.data_distribution[t, :],
-                           kf.i_ppc[t, :],
-                           num_bins=num_bins)
+        kl = kl_divergence(
+            kf.data.data_distribution[t, :], kf.i_ppc[t, :], num_bins=num_bins
+        )
         kl_list.append(kl)
     return np.mean(kl_list)
 
 
 def avg_wasserstein2(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
+    """
+    Compute the average Wasserstein-2 distance.
+
+    Args:
+        kf (object): The EnsembleAdjustmentKalmanFilter object.
+        last_epi (bool, optional): If True, computes only for days up to last_epi_day.
+        last_epi_day (int, optional): Last day of the second epidemic. Defaults to None.
+        min_i (int, optional): Minimum number of infected individuals to consider. Defaults to 100.
+        num_bins (int, optional): Number of bins for histogram. Defaults to 10.
+
+    Returns:
+        float: The average Wasserstein-2 distance.
+    """
     if not hasattr(kf, "i_ppc"):
         betas = np.asarray([θ.beta for θ in kf.θ_list])
         _, _, _, _ = kf.free_sim(betas)
@@ -60,14 +110,27 @@ def avg_wasserstein2(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins=
         days = days[days <= last_epi_day]
     for t in days:
         # Calculate w2
-        w2 = wasserstein2(kf.data.data_distribution[t, :],
-                          kf.i_ppc[t, :],
-                          num_bins=num_bins)
+        w2 = wasserstein2(
+            kf.data.data_distribution[t, :], kf.i_ppc[t, :], num_bins=num_bins
+        )
         w2_list.append(w2)
     return np.mean(w2_list)
 
 
 def avg_kl_divergence_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
+    """
+    Compute the average Kullback-Leibler divergence for EnsembleSquareRootSmoother.
+
+    Args:
+        ks (object): The EnsembleSquareRootSmoother object.
+        last_epi (bool, optional): If True, computes only for days up to last_epi_day.
+        last_epi_day (int, optional): Last day of the second epidemic. Defaults to None.
+        min_i (int, optional): Minimum number of infected individuals to consider. Defaults to 100.
+        num_bins (int, optional): Number of bins for histogram. Defaults to 10.
+
+    Returns:
+        float: The average Kullback-Leibler divergence.
+    """
     if not hasattr(ks, "i_ppc"):
         betas = np.asarray([θ.beta for θ in ks.θ_lag_list])
         _, _, _, _ = ks.free_sim(betas)
@@ -80,14 +143,28 @@ def avg_kl_divergence_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_b
         days = days[days <= last_epi_day]
     for t in days:
         # Calculate KL divergence
-        kl = kl_divergence(ks.data.data_distribution[t, :],
-                           ks.i_ppc[t, :],
-                           num_bins=num_bins)
+        kl = kl_divergence(
+            ks.data.data_distribution[t, :], ks.i_ppc[t, :], num_bins=num_bins
+        )
         kl_list.append(kl)
     return np.mean(kl_list)
 
 
 def avg_wasserstein2_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
+    """
+    Compute the average Wasserstein-2 distance for EnsembleSquareRootSmoother.
+
+    Args:
+        ks (object): The EnsembleSquareRootSmoother object.
+        last_epi (bool, optional): If True, computes only for days up to last_epi_day.
+        last_epi_day (int, optional): Last day of the second epidemic. Defaults to None.
+        min_i (int, optional): Minimum number of infected individuals to consider. Defaults to 100.
+        num_bins (int, optional): Number of bins for histogram. Defaults to 10.
+
+    Returns:
+        float: The average Wasserstein-2 distance.
+    """
+
     if not hasattr(ks, "i_ppc"):
         betas = np.asarray([θ.beta for θ in ks.θ_lag_list])
         _, _, _, _ = ks.free_sim(betas)
@@ -99,14 +176,25 @@ def avg_wasserstein2_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_bi
         days = days[days <= last_epi_day]
     for t in days:
         # Calculate w2
-        w2 = wasserstein2(ks.data.data_distribution[t, :],
-                          ks.i_ppc[t, :],
-                          num_bins=num_bins)
+        w2 = wasserstein2(
+            ks.data.data_distribution[t, :], ks.i_ppc[t, :], num_bins=num_bins
+        )
         w2_list.append(w2)
     return np.mean(w2_list)
 
 
 def compute_ens_var_ks(ks, day):
+    """
+    Compute the ensemble variance of parameter estimates for EnsembleSquareRootSmoother.
+
+    Args:
+        ks (object): The EnsembleSquareRootSmoother object.
+        day (int or str): The day for which to compute the ensemble variance.
+                          If "last", computes for the last day.
+
+    Returns:
+        float: The ensemble variance.
+    """
     if day == "last":
         return np.var(np.asarray([θ.beta * θ.t_I for θ in ks.θ_lag_list])[-1])
     else:
@@ -117,8 +205,20 @@ def compute_ens_var_ks(ks, day):
 
 
 def check_param_in_ci_ks(ks, day, percentile=95):
+    """
+    Check if the parameter estimate falls within the confidence interval for EnsembleSquareRootSmoother.
+
+    Args:
+        ks (object): The EnsembleSquareRootSmoother object.
+        day (int or str): The day for which to check the parameter estimate.
+                          If "last", checks the last day.
+        percentile (float, optional): The percentile for confidence interval. Default is 95.
+
+    Returns:
+        bool: True if the parameter estimate is within the confidence interval, False otherwise.
+    """
     post_betas = np.asarray([θ.beta * θ.t_I for θ in ks.θ_lag_list])
-    quantiles = [(1-percentile/100)/2, 1-(1-percentile/100)/2]
+    quantiles = [(1 - percentile / 100) / 2, 1 - (1 - percentile / 100) / 2]
     quantiles_beta = np.quantile(post_betas, q=quantiles, axis=1)
     lower = quantiles_beta[0, :]
     upper = quantiles_beta[1, :]
@@ -152,8 +252,8 @@ def compute_probs(digitized_data, num_bins):
 def kl_divergence(p_sample, q_sample, epsilon=1e-10, num_bins=10):
     p_bins, q_bins, bins = bin_data(p_sample, q_sample, num_bins)
 
-    p_probs = compute_probs(p_bins, num_bins+1)
-    q_probs = compute_probs(q_bins, num_bins+1)
+    p_probs = compute_probs(p_bins, num_bins + 1)
+    q_probs = compute_probs(q_bins, num_bins + 1)
     assert len(p_probs) == len(q_probs)
 
     p_safe = p_probs + epsilon
@@ -165,8 +265,8 @@ def kl_divergence(p_sample, q_sample, epsilon=1e-10, num_bins=10):
 def wasserstein2(p_sample, q_sample, num_bins=10):
     assert len(p_sample) == len(q_sample)
     p_bins, q_bins, bins = bin_data(p_sample, q_sample, num_bins)
-    p_probs = compute_probs(p_bins, num_bins+1)
-    q_probs = compute_probs(q_bins, num_bins+1)
+    p_probs = compute_probs(p_bins, num_bins + 1)
+    q_probs = compute_probs(q_bins, num_bins + 1)
     assert len(p_probs) == len(q_probs)
     assert np.isclose(np.sum(p_probs), 1.0), "Dist p must sum to 1"
     assert np.isclose(np.sum(q_probs), 1.0), "Dist q must sum to 1"
@@ -183,37 +283,63 @@ def wasserstein2(p_sample, q_sample, num_bins=10):
 
     return w2
 
+
 def data_rmse(kf, last_epi_day=None, last_epi=False):
+    """
+    Compute the root mean square error (RMSE) between the data and case counts posterior.
+
+    Args:
+        kf (object): The EnsembleAdjustmentKalmanFilter object.
+        last_epi_day (int, optional): Last day of the second epidemic. Defaults to None.
+        last_epi (bool, optional): If True, compute RMSE up to last_epi_day.
+
+    Returns:
+        float: The RMSE.
+    """
     if last_epi:
         i_kf = np.array([x.i for x in kf.x_list])
         i_kf = i_kf[:last_epi_day]
-        rmse = np.sqrt(np.mean((i_kf.T - kf.data.i[1:len(i_kf)+1])**2, axis=0))
+        rmse = np.sqrt(np.mean((i_kf.T - kf.data.i[1 : len(i_kf) + 1]) ** 2, axis=0))
     else:
         i_kf = np.array([x.i for x in kf.x_list])
-        rmse = np.sqrt(np.mean((i_kf.T - kf.data.i[1:len(i_kf)+1])**2, axis=0))
+        rmse = np.sqrt(np.mean((i_kf.T - kf.data.i[1 : len(i_kf) + 1]) ** 2, axis=0))
         spread = np.sqrt(np.var(i_kf, axis=1))
 
     return np.mean(rmse)
 
+
 def rt_rmse(kf, last_epi=False, peaks=None):
+    """
+    Compute the root mean square error (RMSE) between the truth and Rt posterior.
+
+    Args:
+        kf (object): The EnsembleAdjustmentKalmanFilter object.
+        last_epi (bool, optional): If True, compute RMSE up to last_epi_day.
+        peaks (int or list of int, optional): Peak day(s) of epidemic(s). Defaults to None.
+
+    Returns:
+        float: The RMSE.
+    """
     if last_epi:
         # compute rmse from day 1 until the last day of the second epidemic
         rt_kf = np.array([θ.beta * θ.t_I for θ in kf.θ_list])
         if peaks > rt_kf.shape[1]:
             # last epi day is past the end of the time series
             last_day = rt_kf.shape[1]
-            rmse = np.sqrt(np.mean((rt_kf[:last_day].T - kf.data.rt[:last_day])**2, axis=0))
+            rmse = np.sqrt(
+                np.mean((rt_kf[:last_day].T - kf.data.rt[:last_day]) ** 2, axis=0)
+            )
         else:
-            rmse = np.sqrt(np.mean((rt_kf[:peaks].T - kf.data.rt[:peaks])**2, axis=0))
-        return(np.mean(rmse))
+            rmse = np.sqrt(np.mean((rt_kf[:peaks].T - kf.data.rt[:peaks]) ** 2, axis=0))
+        return np.mean(rmse)
 
     if peaks is not None:
         rt_kf = np.array([θ.beta * θ.t_I for θ in kf.θ_list])
         try:
-            rmse = np.sqrt(np.mean((rt_kf[peaks].T - kf.data.rt[peaks])**2, axis=0))
+            rmse = np.sqrt(np.mean((rt_kf[peaks].T - kf.data.rt[peaks]) ** 2, axis=0))
             try:
                 peak = peaks[0]
-                rmse = np.sqrt(np.mean((rt_kf[peak].T - kf.data.rt[peak])**2, axis=0))
+                rmse = np.sqrt(np.mean((rt_kf[peak].T - kf.data.rt[peak]) ** 2, axis=0))
             except IndexError as ve:
                 print(f"ValueError: {ve}. Please enter a valid number.")
                 return np.nan
@@ -223,6 +349,6 @@ def rt_rmse(kf, last_epi=False, peaks=None):
 
     else:
         rt_kf = np.array([θ.beta * θ.t_I for θ in kf.θ_list])
-        rmse = np.sqrt(np.mean((rt_kf.T - kf.data.rt[:len(rt_kf)])**2, axis=0))
+        rmse = np.sqrt(np.mean((rt_kf.T - kf.data.rt[: len(rt_kf)]) ** 2, axis=0))
 
     return np.mean(rmse)
