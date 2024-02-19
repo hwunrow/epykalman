@@ -42,6 +42,12 @@ if __name__ == "__main__":
         "--in-dir", type=str, required=True, help="Directory for inputs."
     )
     parser.add_argument(
+        "--pkl-dir",
+        type=str,
+        required=True,
+        help="Directory for synthetic data inputs.",
+    )
+    parser.add_argument(
         "--out-dir", type=str, required=True, help="Directory to save plots and files."
     )
     parser.add_argument(
@@ -60,8 +66,7 @@ if __name__ == "__main__":
     # override if supplied param list
     if args.param_list:
         pickle_files = [
-            f"/ifs/scratch/jls106_gp/nhw2114/data/example_plots_for_paper/{pp}_synthetic_data.pkl"
-            for pp in args.param_list
+            f"{args.pkl_dir}/{pp}_synthetic_data.pkl" for pp in args.param_list
         ]
 
     for i, pickle_file in enumerate(tqdm(pickle_files)):
