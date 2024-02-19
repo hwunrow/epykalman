@@ -236,7 +236,7 @@ def check_param_in_ci_ks(ks, day, percentile=95):
         return lower[-1] <= ks.data.beta[-1] * ks.data.t_I <= upper[-1]
     else:
         assert isinstance(day, int), "day must be integer"
-        if day > len(ks.θ_lag_list):
+        if day >= len(ks.θ_lag_list):
             day = len(ks.θ_lag_list) - 1
         return lower[day] <= ks.data.beta[day] * ks.data.t_I <= upper[day]
 
