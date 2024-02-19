@@ -335,8 +335,7 @@ def rt_rmse(kf, last_epi=False, peaks=None):
     if last_epi:
         # compute rmse from day 1 until the last day of the second epidemic
         assert isinstance(peaks, int), "peaks must be integer"
-        peaks = min(peaks, kf.data.n_t - 1)
-
+        peaks = min(peaks, rt_kf.shape[0] - 1)
         rmse = np.sqrt(np.mean((rt_kf[:peaks].T - kf.data.rt[:peaks]) ** 2, axis=0))
         return np.mean(rmse)
     elif peaks is not None:
