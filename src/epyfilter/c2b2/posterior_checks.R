@@ -249,27 +249,27 @@ data_rmse <- function(dt, synthetic_dt, dd=NULL, last_epi=FALSE, colname=NULL) {
   return(list(rmse_dt = i_dt[, .(data_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window], i_ppc = i_ppc))
 }
 
-rt_rmse <- function(dt, peaks=NULL, last_epi=FALSE, colname=NULL) {
+rt_rmse <- function(dt, dd=NULL, last_epi=FALSE, colname=NULL) {
   dt_copy <- copy(dt)
   samplecols <- paste0("sample", 1:300)
   dt_copy$sqdiff <- rowMeans((dt_copy$rt - dt_copy[, samplecols, with=FALSE])^2)
   
   if (last_epi) {
     # compute rmse from day 1 until the last day of the second epidemic
-    result_dt <- dt_copy[day <= peaks, sqrt(mean(sqdiff, na.rm=TRUE)), by=window]
+    result_dt <- dt_copy[day <= dd, sqrt(mean(sqdiff, na.rm=TRUE)), by=window]
     setnames(result_dt, "V1", colname)
     return(result_dt)
   }
   
-  if (is.null(peaks)) {
+  if (is.null(dd)) {
     return(dt_copy[, .(rt_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window])
   } else {
-    if (all(peaks %in% unique(dt_copy$day))) {
+    if (all(dd %in% unique(dt_copy$day))) {
       # all peaks in dt
-      return(dt_copy[day %in% peaks, .(rt_peak_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window])
-    } else if (peaks[1] %in% unique(dt_copy$day)) {
+      return(dt_copy[day %in% dd, .(rt_peak_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window])
+    } else if (dd[1] %in% unique(dt_copy$day)) {
       # first peak in dt
-      return(dt_copy[day == peaks[1], .(rt_peak_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window])
+      return(dt_copy[day == dd[1], .(rt_peak_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window])
     } else {
       return(NA)
     }
