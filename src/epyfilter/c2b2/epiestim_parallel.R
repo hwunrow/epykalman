@@ -45,7 +45,7 @@ if (length(param_list) != 0) {
   print(pickle_files)
 }
 
-files <- paste0(data_dir, pickle_files$param, "_for_epiestim.csv")
+files <- paste0(out_dir, pickle_files$param, "_for_epiestim.csv")
 
 last_epidemic_days = fread(paste0(in_dir,"compute_days.csv"))
 
@@ -56,7 +56,7 @@ for (file in files) {
   peaks <- c(last_epidemic_days[param == param_num]$peak1, last_epidemic_days[param == param_num]$peak2)
   
   # read in data distribution, late_day, and peaks used for posterior checks
-  data_dt <- fread(paste0(out_dir, param_num, "_data_distribution.csv"))
+  data_dt <- fread(paste0(data_dir, param_num, "_data_distribution.csv"))
   
   # read in rt, i, and prop_S synthetic data
   synthetic_dt <- fread(file)
