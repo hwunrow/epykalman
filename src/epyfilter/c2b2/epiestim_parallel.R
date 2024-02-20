@@ -19,6 +19,7 @@ parser$add_argument("--data-dir", help = "directory for synthetic inputs", defau
 parser$add_argument("--out-dir", help = "directory for this steps checks", default = "/ifs/scratch/jls106_gp/nhw2114/data/20231106_synthetic_data/", type = "character")
 parser$add_argument("--files-per-task", help = "number of files per array job", default = 10, type = "integer")
 parser$add_argument("--param-list", nargs='+', help = "rerun for specific params", type = "integer")
+parser$add_argument("--plot", action="store_true", help="Plot results.")
 
 args <- parser$parse_args()
 print(args)
@@ -46,16 +47,16 @@ if (length(param_list) != 0) {
 
 files <- paste0(data_dir, pickle_files$param, "_for_epiestim.csv")
 
-last_epidemic_days = fread(paste0(in_dir,"last_epidemic_day.csv"))
+last_epidemic_days = fread(paste0(in_dir,"compute_days.csv"))
 
 for (file in files) {
   param_num <- strsplit(basename(file), "_")[[1]][1]
-  last_epi_day <- last_epidemic_days[param == param_num]$last_epidemic_day
+  last_epi_day <- last_epidemic_days[param == param_num]$last_epi_day
+  late_day <- last_epidemic_days[param == param_num]$late_day
+  peaks <- c(last_epidemic_days[param == param_num]$peak1, last_epidemic_days[param == param_num]$peak2)
   
   # read in data distribution, late_day, and peaks used for posterior checks
   data_dt <- fread(paste0(out_dir, param_num, "_data_distribution.csv"))
-  late_day <- unique(data_dt$late_day)
-  peaks <- c(unique(data_dt$peak1), unique(data_dt$peak2))
   
   # read in rt, i, and prop_S synthetic data
   synthetic_dt <- fread(file)
@@ -87,14 +88,16 @@ for (file in files) {
     
     res_plot_list[[time_window]] <- plot(res)
     
-    g1 <- ggplot(r_dt) + 
-      geom_line(aes(x=t_start, y=epiestim_mean)) + 
-      geom_ribbon(aes(x=t_start, ymin=epiestim_lower, ymax=epiestim_upper), alpha=0.5) +
-      geom_line(aes(x=t_start, y=true, color="red")) + 
-      theme_bw() + labs(title = paste0("EpiEstim ", time_window, " Day Window")) + 
-      xlab("day") + ylab("R_t")
-    
-    plot_list[[time_window]] <- g1
+    if (plot) {
+      g1 <- ggplot(r_dt) + 
+        geom_line(aes(x=t_start, y=epiestim_mean)) + 
+        geom_ribbon(aes(x=t_start, ymin=epiestim_lower, ymax=epiestim_upper), alpha=0.5) +
+        geom_line(aes(x=t_start, y=true, color="red")) + 
+        theme_bw() + labs(title = paste0("EpiEstim ", time_window, " Day Window")) + 
+        xlab("day") + ylab("R_t")
+      
+      plot_list[[time_window]] <- g1
+    }
     
     # sample from posterior
     helper_sample_posterior <- function(x, R, n) {
@@ -141,28 +144,42 @@ for (file in files) {
   post_checks_dt <- Reduce(function(x, y) merge(x, y, by = "window"), list(
     rt_rmse(R_posterior_all_dt, peaks),
     rt_rmse(R_posterior_all_dt),
-    rt_rmse(R_posterior_all_dt, last_epi_day, last_epi=TRUE),
+    rt_rmse(R_posterior_all_dt, last_epi_day, last_epi=TRUE, colname="rt_rmse_last_epi_day"),
+    rt_rmse(R_posterior_all_dt, last_epi_day - 1, last_epi=TRUE, colname="rt_rmse_before_last_epi_day"),
+    rt_rmse(R_posterior_all_dt, last_epi_day + 1, last_epi=TRUE, colname="rt_rmse_after_last_epi_day"),
     rmse_dt,
-    data_rmse(R_posterior_all_dt, synthetic_dt, last_epi_day, last_epi=TRUE),
+    data_rmse(R_posterior_all_dt, synthetic_dt, last_epi_day, last_epi=TRUE, colname="data_rmse_last_epi_day"),
+    data_rmse(R_posterior_all_dt, synthetic_dt, last_epi_day - 1, last_epi=TRUE, colname="data_rmse_before_last_epi_day"),
+    data_rmse(R_posterior_all_dt, synthetic_dt, last_epi_day + 1, last_epi=TRUE, colname="data_rmse_after_last_epi_day"),
     avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc),
     avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc),
-    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day),
-    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day),
+    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day, colname="avg_w2_last_epi_day"),
+    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day - 1, colname="avg_w2_before_last_epi_day"),
+    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day + 1, colname="avg_w2_after_last_epi_day"),
+    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day, colname="avg_kl_last_epi_day"),
+    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day - 1, colname="avg_kl_before_last_epi_day"),
+    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day + 1, colname="avg_kl_after_last_epi_day"),
     check_param_in_ci(R_posterior_all_dt, late_day),
     compute_ens_var(R_posterior_all_dt, late_day),
     check_param_in_ci(R_posterior_all_dt, "last"),
     compute_ens_var(R_posterior_all_dt, "last"),
-    check_param_in_ci(R_posterior_all_dt, last_epi_day, last_epi=TRUE),
-    compute_ens_var(R_posterior_all_dt, last_epi_day, last_epi=TRUE)
+    check_param_in_ci(R_posterior_all_dt, last_epi_day, last_epi=TRUE, colname="in_ci_last_epi_day"),
+    check_param_in_ci(R_posterior_all_dt, last_epi_day - 1, last_epi=TRUE, colname="in_ci_before_last_epi_day"),
+    check_param_in_ci(R_posterior_all_dt, last_epi_day + 1, last_epi=TRUE, colname="in_ci_after_last_epi_day"),
+    compute_ens_var(R_posterior_all_dt, last_epi_day, last_epi=TRUE, colname="ens_var_last_epi_day"),
+    compute_ens_var(R_posterior_all_dt, last_epi_day - 1, last_epi=TRUE, colname="ens_var_before_last_epi_day"),
+    compute_ens_var(R_posterior_all_dt, last_epi_day + 1, last_epi=TRUE, colname="ens_var_after_last_epi_day")
   ))
   fwrite(post_checks_dt, file=paste0(out_dir,"/",param_num, "_epiEstim_metrics.csv"))
   
-  pdf(paste0(out_dir,"/",param_num,"_epiEsim_plots.pdf"), width = 8, height = 6)
-  for (i in 1:20) {
-    print(plot_list[[i]])
-    plot(res_plot_list[[i]])
+  if (plot) {
+    pdf(paste0(out_dir,"/",param_num,"_epiEsim_plots.pdf"), width = 8, height = 6)
+    for (i in 1:20) {
+      print(plot_list[[i]])
+      plot(res_plot_list[[i]])
+    }
+    dev.off()
   }
-  dev.off()
 }
 print("DONE!")
 
