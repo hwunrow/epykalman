@@ -5,7 +5,7 @@ import pandas as pd
 import pickle
 import logging
 from tqdm import tqdm
-from epyfilter import model_da, eakf, enks, posterior_checks, simulate_data
+from epyfilter import model_da, eakf, enks, posterior_checks
 from matplotlib.backends.backend_pdf import PdfPages
 
 
@@ -165,7 +165,7 @@ if __name__ == "__main__":
     try:
         sge_task_id = int(os.environ.get("SGE_TASK_ID"))
         sge_outputs_file = os.environ.get("SGE_STDOUT_PATH")
-    except:
+    except Exception:
         sge_task_id = 1
         sge_outputs_file = "test.log"
 
