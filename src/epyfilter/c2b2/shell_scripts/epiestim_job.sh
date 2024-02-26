@@ -1,5 +1,5 @@
 #!/bin/bash
-#$ -l mem=10G,time=12:: -S /bin/bash -N epiestim -t 1-13
+#$ -l mem=10G,time=12:: -S /bin/bash -N epiestim
 #$ -e /ifs/scratch/jls106_gp/nhw2114/data/20240212_run
 #$ -o /ifs/scratch/jls106_gp/nhw2114/data/20240212_run
 module load singularity
@@ -9,4 +9,4 @@ PASSWORD='ihme123' singularity exec --bind "$HOME"/run:/run,"$HOME"/var-lib-rstu
     --data-dir /ifs/scratch/jls106_gp/nhw2114/data/20231106_synthetic_data/ \
     --out-dir /ifs/scratch/jls106_gp/nhw2114/data/20240212_run/ \
     --param-file todo_params.csv \
-    --files-per-task 50
+    --files-per-task 2
