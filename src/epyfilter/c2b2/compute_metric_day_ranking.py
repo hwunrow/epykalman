@@ -14,12 +14,13 @@ def open_pickle(pickle_file):
     return data
 
 
-def score_rank_hist(file_prefix, n_real, n_ens):
+def score_rank_hist(file_prefix, n_real, n_ens, smooth=False):
     scores = []
-    rank = np.zeros((n_real, 365))
-    percentiles = np.zeros((n_real, 365))
+    # figure out how many days there are in posterior
+    days = len(open_pickle(args.pkl_dir + f"/{file_prefix}_0.pkl").θ_list)
+    rank = np.zeros((n_real, days))
+    percentiles = np.zeros((n_real, days))
     for run in tqdm(range(args.n_real)):
-        print(file_prefix)
         file = args.pkl_dir + f"/{file_prefix}_{run}.pkl"
         eakf = open_pickle(file)
 
@@ -27,16 +28,19 @@ def score_rank_hist(file_prefix, n_real, n_ens):
         post_rt = np.sort(np.array([θ.beta * θ.t_I for θ in eakf.θ_list]), axis=1)
 
         # find which index in ensemble posterior the truth lies
-        idx = (post_rt.T < truth_rt).sum(axis=0)
+        idx = (post_rt.T < truth_rt[:post_rt.shape[0]]).sum(axis=0)
         rank[run, :] = idx
 
         # map from index to percentile p (smallest one where truth lives within p% CrI)
         # each ensemble member has mass 1 / eakf.m
         # for cases where; the truth does not lie within idx = 0 or idx = n_ens
-        assert n_ens == eakf.m
+        if smooth:
+            assert n_ens == eakf.eakf.m
+        else:
+            assert n_ens == eakf.m
         percentiles[run, :] = np.maximum(1 - 2*idx/n_ens, 2*idx/n_ens - 1)
 
-    for i in range(eakf.data.n_t):
+    for i in range(days):
         hist = np.histogram(rank[:, i], bins=np.arange(0, n_ens + 1))[0]
         scores.append(np.sum(np.abs(hist[0] - n_real/(n_ens + 1))))
 
@@ -79,7 +83,7 @@ def crps(observation, ensembles):
     return crps_score
 
 
-def crps_all_runs(file_prefix):
+def crps_all_runs(file_prefix, n_real):
     """
     Calculate the average Continuous Ranked Probability Score (CRPS) across all runs.
 
@@ -90,7 +94,7 @@ def crps_all_runs(file_prefix):
         crps_all_runs (array_like): The average CRPS scores.
     """
     crps_all_runs = []
-    for run in tqdm(range(100)):
+    for run in tqdm(range(n_real)):
         file = args.pkl_dir + f"/{file_prefix}_{run}.pkl"
         eakf = open_pickle(file)
 
@@ -98,8 +102,8 @@ def crps_all_runs(file_prefix):
         post_rts = np.sort(np.array([θ.beta * θ.t_I for θ in eakf.θ_list]), axis=1)
 
         scores = []
-        for i, obs in enumerate(truth):
-            scores.append(crps(obs, post_rts[i,:]))
+        for i, obs in enumerate(truth[:post_rts.shape[0]]):
+            scores.append(crps(obs, post_rts[i, :]))
 
         crps_all_runs.append(scores)
 
@@ -107,7 +111,7 @@ def crps_all_runs(file_prefix):
     return crps_all_runs
 
 
-def rmse_all_runs(file_prefix):
+def rmse_all_runs(file_prefix, n_real):
     """
     Calculate the average root mean square error (RMSE) across all runs.
 
@@ -118,14 +122,14 @@ def rmse_all_runs(file_prefix):
         rmse_all_runs (array_like): The average RMSE.
     """
     rmse_all_runs = []
-    for run in tqdm(range(100)):
+    for run in tqdm(range(n_real)):
         file = args.pkl_dir + f"/{file_prefix}_{run}.pkl"
         eakf = open_pickle(file)
 
         truth = eakf.data.beta * eakf.data.t_I
         post_rts = np.sort(np.array([θ.beta * θ.t_I for θ in eakf.θ_list]), axis=1)
 
-        rmse = np.mean(np.square((post_rts - truth[:, np.newaxis])), axis=1)
+        rmse = np.mean(np.square((post_rts - truth[:post_rts.shape[0], np.newaxis])), axis=1)
 
         rmse_all_runs.append(rmse)
 
@@ -207,7 +211,7 @@ if __name__ == "__main__":
         fixed_percentiles, fixed_rank_hist_score = \
             score_rank_hist(f"{pp}_fixed_inflation_run", args.n_real, args.n_ens)
         smooth_percentiles, smooth_rank_hist_score = \
-            score_rank_hist(f"{pp}_smooth_inflation_run", args.n_real, args.n_ens)
+            score_rank_hist(f"{pp}_smooth_inflation_run", args.n_real, args.n_ens, smooth=True)
 
         # compute reliability scores
         adapt_reliability_score = score_reliability(adapt_percentiles, args.n_real, args.n_ens)
@@ -216,16 +220,16 @@ if __name__ == "__main__":
         smooth_reliability_score = score_reliability(smooth_percentiles, args.n_real, args.n_ens)
 
         # compute crps
-        adapt_crps_scores = crps_all_runs(f"{pp}_adaptive_inflation_run")
-        no_crps_scores = crps_all_runs(f"{pp}_no_inflation_run")
-        fixed_crps_scores = crps_all_runs(f"{pp}_fixed_inflation_run")
-        smooth_crps_scores = crps_all_runs(f"{pp}_smooth_inflation_run")
+        adapt_crps_scores = crps_all_runs(f"{pp}_adaptive_inflation_run", args.n_real)
+        no_crps_scores = crps_all_runs(f"{pp}_no_inflation_run", args.n_real)
+        fixed_crps_scores = crps_all_runs(f"{pp}_fixed_inflation_run", args.n_real)
+        smooth_crps_scores = crps_all_runs(f"{pp}_smooth_inflation_run", args.n_real)
 
         # compute rmse
-        adapt_rmse_scores = rmse_all_runs(f"{pp}_adaptive_inflation_run")
-        no_rmse_scores = rmse_all_runs(f"{pp}_no_inflation_run")
-        fixed_rmse_scores = rmse_all_runs(f"{pp}_fixed_inflation_run")
-        smooth_rmse_scores = rmse_all_runs(f"{pp}_smooth_inflation_run")
+        adapt_rmse_scores = rmse_all_runs(f"{pp}_adaptive_inflation_run", args.n_real)
+        no_rmse_scores = rmse_all_runs(f"{pp}_no_inflation_run", args.n_real)
+        fixed_rmse_scores = rmse_all_runs(f"{pp}_fixed_inflation_run", args.n_real)
+        smooth_rmse_scores = rmse_all_runs(f"{pp}_smooth_inflation_run", args.n_real)
 
         # save results
         adapt_df = pd.DataFrame(
@@ -277,7 +281,7 @@ if __name__ == "__main__":
         smooth_df['average'] = np.argsort(smooth_df[["rank_hist", "reliability", "crps", "rmse"]].mean(axis=1))
 
         rank_df = pd.concat([adapt_df, no_df, fixed_df, smooth_df])
-        rank_df.to_csv(args.out_dir + f"{pp}_rank_df.csv", index=False)
+        rank_df.to_csv(args.out_dir + f"/{pp}_rank_df.csv", index=False)
         logger.info(f"{pp} saved csv")
 
 logger.info("DONE")
