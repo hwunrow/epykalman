@@ -19,6 +19,7 @@ parser$add_argument("--data-dir", help = "directory for synthetic inputs", defau
 parser$add_argument("--out-dir", help = "directory for this steps checks", default = "/ifs/scratch/jls106_gp/nhw2114/data/20231106_synthetic_data/", type = "character")
 parser$add_argument("--files-per-task", help = "number of files per array job", default = 10, type = "integer")
 parser$add_argument("--param-list", nargs='+', help = "rerun for specific params", type = "integer")
+parser$add_argument("--param-file", help = "file with list of parameters to run for array job", default = "good_param_list.csv", type = "character")
 parser$add_argument("--plot", action="store_true", help="Plot results.")
 
 args <- parser$parse_args()
@@ -31,7 +32,7 @@ print(task_id)
 if (is.na(task_id)) {
   task_id <- 1
 }
-dt <- fread(file.path(in_dir, "good_param_list.csv"))
+dt <- fread(file.path(in_dir, param_file))
 start_row <- (task_id - 1) * files_per_task + 1
 end_row <- task_id * files_per_task
 if (end_row < nrow(dt)) {
