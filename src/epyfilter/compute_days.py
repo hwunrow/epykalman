@@ -6,6 +6,7 @@ import numpy as np
 import os
 import logging
 import argparse
+from scipy.signal import argrelmin
 
 
 def compute_late_day(data):
@@ -27,6 +28,22 @@ def compute_peaks(data):
     peak_days = peak_days[:2]  # just take first two days
     return peak_days
 
+
+def compute_first_epi_day(data):
+    det_data = simulate_data.simulate_data(**data.true_params, run_deterministic=True)
+
+    zero_days = np.where(det_data.i_true == 0)[0]
+    peaks = compute_peaks(det_data)
+    inbtw_zero_days = np.where((zero_days > peaks[0]) & (zero_days < peaks[1]))[0]
+
+    if len(inbtw_zero_days) == 0:
+        first_epi_day = argrelmin(det_data.i_true)[0]
+    else:
+        # if there are zeros in between the two epidemics
+        # then choose the last zero before the start of the second epidemic
+        first_epi_day = inbtw_zero_days[-1]
+
+    return first_epi_day
 
 def compute_last_epi_day(data):
     zero_days = np.where(data.i_true == 0)[0]
@@ -97,6 +114,7 @@ if __name__ == "__main__":
         late_day = compute_late_day(data)
         peaks = compute_peaks(data)
         last_epi_day = compute_last_epi_day(data)
+        first_epi_day = compute_first_epi_day(data)
 
         dates.append(
             {
@@ -105,6 +123,7 @@ if __name__ == "__main__":
                 "peak1": peaks[0],
                 "peak2": peaks[1],
                 "last_epi_day": last_epi_day,
+                "first_epi_day": first_epi_day,
             }
         )
 
