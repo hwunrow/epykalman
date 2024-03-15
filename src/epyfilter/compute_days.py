@@ -39,7 +39,7 @@ def compute_first_epi_day(data):
     inbtw_zero_days = np.where((zero_days > peaks[0]) & (zero_days < peaks[1]))[0]
 
     if len(inbtw_zero_days) == 0:
-        first_epi_day = argrelmin(det_data.i_true)[0]
+        first_epi_day = argrelmin(det_data.i_true)[0][0]
     else:
         # if there are zeros in between the two epidemics
         # then choose the last zero before the start of the second epidemic
