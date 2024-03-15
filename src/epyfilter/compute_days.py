@@ -21,7 +21,8 @@ def compute_late_day(data):
 
 
 def compute_peaks(data):
-    det_data = simulate_data.simulate_data(**data.true_params, run_deterministic=True)
+    det_data = simulate_data.simulate_data(**data.true_params,
+                                           run_deterministic=True)
     (peak_days,) = np.where(
         np.diff(np.sign(np.diff(det_data.i_true))) == -2
     )  # days where it increases before then decreases
@@ -30,7 +31,8 @@ def compute_peaks(data):
 
 
 def compute_first_epi_day(data):
-    det_data = simulate_data.simulate_data(**data.true_params, run_deterministic=True)
+    det_data = simulate_data.simulate_data(**data.true_params,
+                                           run_deterministic=True)
 
     zero_days = np.where(det_data.i_true == 0)[0]
     peaks = compute_peaks(det_data)
@@ -44,6 +46,7 @@ def compute_first_epi_day(data):
         first_epi_day = inbtw_zero_days[-1]
 
     return first_epi_day
+
 
 def compute_last_epi_day(data):
     zero_days = np.where(data.i_true == 0)[0]
@@ -98,6 +101,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--param-list", type=int, nargs="+", help="Rerunning for specific sge_task_ids"
     )
+    parser.add_argument(
+        "--compute-dd", action='store_true', help="compute data distribution and save"
+    )
     args = parser.parse_args()
 
     if not args.param_list:  # if no param list is provided, do all params
@@ -126,22 +132,22 @@ if __name__ == "__main__":
                 "first_epi_day": first_epi_day,
             }
         )
-
-        # save data distribution csv
-        data_distribution_df = pd.DataFrame(
-            data.data_distribution,
-            columns=[
-                f"sample{x}" for x in range(1, data.data_distribution.shape[1] + 1)
-            ],
-        )
-        data_distribution_df["day"] = range(len(data_distribution_df))
-        data_distribution_df["late_day"] = compute_late_day(data)
-        data_distribution_df["peak1"] = peaks[0]
-        data_distribution_df["peak2"] = peaks[1]
-        data_distribution_df["last_epi_day"] = last_epi_day
-        data_distribution_df.to_csv(
-            f"{args.out_dir}/{pp}_data_distribution.csv", index=False
-        )
+        if args.compute_dd:
+            # save data distribution csv
+            data_distribution_df = pd.DataFrame(
+                data.data_distribution,
+                columns=[
+                    f"sample{x}" for x in range(1, data.data_distribution.shape[1] + 1)
+                ],
+            )
+            data_distribution_df["day"] = range(len(data_distribution_df))
+            data_distribution_df["late_day"] = compute_late_day(data)
+            data_distribution_df["peak1"] = peaks[0]
+            data_distribution_df["peak2"] = peaks[1]
+            data_distribution_df["last_epi_day"] = last_epi_day
+            data_distribution_df.to_csv(
+                f"{args.out_dir}/{pp}_data_distribution.csv", index=False
+            )
         logger.info(f"{pp}")
     dates_df = pd.DataFrame(dates)
     dates_df.to_csv(f"{args.out_dir}/compute_days.csv", index=False)
