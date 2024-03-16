@@ -16,8 +16,6 @@ def compute_posterior_checks(kf, method_name, is_ks=False):
     kf_checks = pd.DataFrame(
         {
             "method": method_name,
-            # "rt_peak_rmse": posterior_checks.rt_rmse(kf, peaks=peak_days),
-            # "rt_rmse": posterior_checks.rt_rmse(kf),
             "rt_rmse_last_epi_day": posterior_checks.rt_rmse(kf, True, last_epi_day),
             "rt_rmse_before_last_epi_day": posterior_checks.rt_rmse(
                 kf, True, last_epi_day - 1
@@ -25,20 +23,6 @@ def compute_posterior_checks(kf, method_name, is_ks=False):
             "rt_rmse_after_last_epi_day": posterior_checks.rt_rmse(
                 kf, True, last_epi_day + 1
             ),
-            # "data_rmse": posterior_checks.data_rmse(kf),
-            # "data_rmse_last_epi_day": posterior_checks.data_rmse(
-            #     kf, True, last_epi_day
-            # ),
-            # "avg_w2": (
-            #     posterior_checks.avg_wasserstein2_ks(kf)
-            #     if is_ks
-            #     else posterior_checks.avg_wasserstein2(kf)
-            # ),
-            # "avg_kl": (
-            #     posterior_checks.avg_kl_divergence_ks(kf)
-            #     if is_ks
-            #     else posterior_checks.avg_kl_divergence(kf)
-            # ),
             "avg_w2_last_epi_day": (
                 posterior_checks.avg_wasserstein2_ks(kf, True, last_epi_day)
                 if is_ks
@@ -69,26 +53,6 @@ def compute_posterior_checks(kf, method_name, is_ks=False):
                 if is_ks
                 else posterior_checks.avg_kl_divergence(kf, True, last_epi_day + 1)
             ),
-            # "in_ci": (
-            #     posterior_checks.check_param_in_ci_ks(kf, late_day)
-            #     if is_ks
-            #     else posterior_checks.check_param_in_ci(kf, late_day)
-            # ),
-            # "ens_var": (
-            #     posterior_checks.compute_ens_var_ks(kf, late_day)
-            #     if is_ks
-            #     else posterior_checks.compute_ens_var(kf, late_day)
-            # ),
-            # "in_ci_last_day": (
-            #     posterior_checks.check_param_in_ci_ks(kf, "last")
-            #     if is_ks
-            #     else posterior_checks.check_param_in_ci(kf, "last")
-            # ),
-            # "ens_var_last_day": (
-            #     posterior_checks.compute_ens_var_ks(kf, "last")
-            #     if is_ks
-            #     else posterior_checks.compute_ens_var(kf, "last")
-            # ),
             "in_ci_last_epi_day": (
                 posterior_checks.check_param_in_ci_ks(kf, last_epi_day)
                 if is_ks
@@ -104,11 +68,6 @@ def compute_posterior_checks(kf, method_name, is_ks=False):
                 if is_ks
                 else posterior_checks.check_param_in_ci(kf, last_epi_day + 1)
             ),
-            # "ens_var_last_epi_day": (
-            #     posterior_checks.compute_ens_var_ks(kf, last_epi_day)
-            #     if is_ks
-            #     else posterior_checks.compute_ens_var(kf, last_epi_day)
-            # ),
         },
         index=[0],
     )
