@@ -17,56 +17,20 @@ def compute_posterior_checks(kf, method_name, is_ks=False):
         {
             "method": method_name,
             "rt_rmse_last_epi_day": posterior_checks.rt_rmse(kf, True, last_epi_day),
-            "rt_rmse_before_last_epi_day": posterior_checks.rt_rmse(
-                kf, True, last_epi_day - 1
-            ),
-            "rt_rmse_after_last_epi_day": posterior_checks.rt_rmse(
-                kf, True, last_epi_day + 1
-            ),
             "avg_w2_last_epi_day": (
                 posterior_checks.avg_wasserstein2_ks(kf, True, last_epi_day)
                 if is_ks
                 else posterior_checks.avg_wasserstein2(kf, True, last_epi_day)
-            ),
-            "avg_w2_before_last_epi_day": (
-                posterior_checks.avg_wasserstein2_ks(kf, True, last_epi_day - 1)
-                if is_ks
-                else posterior_checks.avg_wasserstein2(kf, True, last_epi_day - 1)
-            ),
-            "avg_w2_after_last_epi_day": (
-                posterior_checks.avg_wasserstein2_ks(kf, True, last_epi_day + 1)
-                if is_ks
-                else posterior_checks.avg_wasserstein2(kf, True, last_epi_day + 1)
             ),
             "avg_kl_last_epi_day": (
                 posterior_checks.avg_kl_divergence_ks(kf, True, last_epi_day)
                 if is_ks
                 else posterior_checks.avg_kl_divergence(kf, True, last_epi_day)
             ),
-            "avg_kl_before_last_epi_day": (
-                posterior_checks.avg_kl_divergence_ks(kf, True, last_epi_day - 1)
-                if is_ks
-                else posterior_checks.avg_kl_divergence(kf, True, last_epi_day - 1)
-            ),
-            "avg_kl_after_last_epi_day": (
-                posterior_checks.avg_kl_divergence_ks(kf, True, last_epi_day + 1)
-                if is_ks
-                else posterior_checks.avg_kl_divergence(kf, True, last_epi_day + 1)
-            ),
             "in_ci_last_epi_day": (
                 posterior_checks.check_param_in_ci_ks(kf, last_epi_day)
                 if is_ks
                 else posterior_checks.check_param_in_ci(kf, last_epi_day)
-            ),
-            "in_ci_before_last_epi_day": (
-                posterior_checks.check_param_in_ci_ks(kf, last_epi_day - 1)
-                if is_ks
-                else posterior_checks.check_param_in_ci(kf, last_epi_day - 1)
-            ),
-            "in_ci_after_last_epi_day": (
-                posterior_checks.check_param_in_ci_ks(kf, last_epi_day + 1)
-                if is_ks
-                else posterior_checks.check_param_in_ci(kf, last_epi_day + 1)
             ),
         },
         index=[0],
