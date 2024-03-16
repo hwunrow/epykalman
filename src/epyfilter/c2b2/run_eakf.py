@@ -32,6 +32,22 @@ def compute_posterior_checks(kf, method_name, is_ks=False):
                 if is_ks
                 else posterior_checks.check_param_in_ci(kf, last_epi_day)
             ),
+            "rt_rmse_first_epi_day": posterior_checks.rt_rmse(kf, True, first_epi_day),
+            "avg_w2_first_epi_day": (
+                posterior_checks.avg_wasserstein2_ks(kf, True, first_epi_day)
+                if is_ks
+                else posterior_checks.avg_wasserstein2(kf, True, first_epi_day)
+            ),
+            "avg_kl_first_epi_day": (
+                posterior_checks.avg_kl_divergence_ks(kf, True, first_epi_day)
+                if is_ks
+                else posterior_checks.avg_kl_divergence(kf, True, first_epi_day)
+            ),
+            "in_ci_first_epi_day": (
+                posterior_checks.check_param_in_ci_ks(kf, first_epi_day)
+                if is_ks
+                else posterior_checks.check_param_in_ci(kf, first_epi_day)
+            ),
         },
         index=[0],
     )
@@ -190,6 +206,11 @@ if __name__ == "__main__":
         last_epi_day = int(
             last_epidemic_days_df.loc[
                 last_epidemic_days_df.param == int(param_num), "last_epi_day"
+            ].values[0]
+        )
+        first_epi_day = int(
+            last_epidemic_days_df.loc[
+                last_epidemic_days_df.param == int(param_num), "first_epi_day"
             ].values[0]
         )
 
