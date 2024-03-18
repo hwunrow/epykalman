@@ -31,6 +31,29 @@ def check_param_in_ci(kf, day, percentile=95):
             return lower[day] <= kf.data.beta[day] * kf.data.t_I <= upper[day]
 
 
+def crps(kf, day):
+    """
+    Calculate the Continuous Ranked Probability Score (CRPS).
+
+    Parameters:
+        kf (object): The EnsembleAdjustmentKalmanFilter object.
+        day (int or str): The day for which to compute the ensemble variance.
+
+    Returns:
+        crps_score (float): The CRPS score.
+    """
+    ensembles = np.array([x.i for x in kf.x_list])
+    ensembles = ensembles[day]
+    observation = kf.data.i[day]
+    hist, bins = np.histogram(ensembles, bins=len(np.unique(ensembles)))
+    cdf = np.cumsum(hist/ensembles.shape[0])
+    crps_score = 0
+    for i, x in enumerate(bins[1:]):
+        crps_score += (cdf[i] - np.heaviside(x-observation, 0.5))**2 * (bins[i] - bins[i-1])
+
+    return crps_score
+
+
 def compute_ens_var(kf, day):
     """
     Compute the ensemble variance of parameter estimates.
