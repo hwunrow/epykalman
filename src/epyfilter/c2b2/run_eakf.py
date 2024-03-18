@@ -16,38 +16,62 @@ def compute_posterior_checks(kf, method_name, is_ks=False):
     kf_checks = pd.DataFrame(
         {
             "method": method_name,
-            "rt_rmse_last_epi_day": posterior_checks.rt_rmse(kf, True, last_epi_day),
-            "avg_w2_last_epi_day": (
-                posterior_checks.avg_wasserstein2_ks(kf, True, last_epi_day)
+            "rt_rmse_up_to_last_epi_day": posterior_checks.rt_rmse(kf, True, last_epi_day),
+            "rt_rmse_last_epi_day": posterior_checks.rt_rmse(kf, False, last_epi_day),
+            "avg_w2_up_to_last_epi_day": (
+                posterior_checks.avg_wasserstein2_ks(kf, last_epi_day)
                 if is_ks
-                else posterior_checks.avg_wasserstein2(kf, True, last_epi_day)
+                else posterior_checks.avg_wasserstein2(kf, last_epi_day)
+            ),
+            "avg_w2_last_epi_day": (
+                posterior_checks.avg_wasserstein2_ks(kf, last_epi_day, evaluate_on=True)
+                if is_ks
+                else posterior_checks.avg_wasserstein2(kf, last_epi_day, evaluate_on=True)
+            ),
+            "avg_kl_up_to_last_epi_day": (
+                posterior_checks.avg_kl_divergence_ks(kf, last_epi_day)
+                if is_ks
+                else posterior_checks.avg_kl_divergence(kf, last_epi_day)
             ),
             "avg_kl_last_epi_day": (
-                posterior_checks.avg_kl_divergence_ks(kf, True, last_epi_day)
+                posterior_checks.avg_kl_divergence_ks(kf, last_epi_day, evaluate_on=True)
                 if is_ks
-                else posterior_checks.avg_kl_divergence(kf, True, last_epi_day)
+                else posterior_checks.avg_kl_divergence(kf, True, last_epi_day, evaluate_on=True)
             ),
             "in_ci_last_epi_day": (
                 posterior_checks.check_param_in_ci_ks(kf, last_epi_day)
                 if is_ks
                 else posterior_checks.check_param_in_ci(kf, last_epi_day)
             ),
-            "rt_rmse_first_epi_day": posterior_checks.rt_rmse(kf, True, first_epi_day),
-            "avg_w2_first_epi_day": (
-                posterior_checks.avg_wasserstein2_ks(kf, True, first_epi_day)
+            "crps_last_epi_day": posterior_checks.crps(kf, last_epi_day),
+            "rt_rmse_up_to_first_epi_day": posterior_checks.rt_rmse(kf, True, first_epi_day),
+            "rt_rmse_first_epi_day": posterior_checks.rt_rmse(kf, False, first_epi_day),
+            "avg_w2_up_to_first_epi_day": (
+                posterior_checks.avg_wasserstein2_ks(kf, first_epi_day)
                 if is_ks
-                else posterior_checks.avg_wasserstein2(kf, True, first_epi_day)
+                else posterior_checks.avg_wasserstein2(kf, first_epi_day)
+            ),
+            "avg_w2_first_epi_day": (
+                posterior_checks.avg_wasserstein2_ks(kf, first_epi_day, evaluate_on=True)
+                if is_ks
+                else posterior_checks.avg_wasserstein2(kf, first_epi_day, evaluate_on=True)
+            ),
+            "avg_kl_up_to_first_epi_day": (
+                posterior_checks.avg_kl_divergence_ks(kf, first_epi_day)
+                if is_ks
+                else posterior_checks.avg_kl_divergence(kf, first_epi_day)
             ),
             "avg_kl_first_epi_day": (
-                posterior_checks.avg_kl_divergence_ks(kf, True, first_epi_day)
+                posterior_checks.avg_kl_divergence_ks(kf, first_epi_day, evaluate_on=True)
                 if is_ks
-                else posterior_checks.avg_kl_divergence(kf, True, first_epi_day)
+                else posterior_checks.avg_kl_divergence(kf, first_epi_day, evaluate_on=True)
             ),
             "in_ci_first_epi_day": (
                 posterior_checks.check_param_in_ci_ks(kf, first_epi_day)
                 if is_ks
                 else posterior_checks.check_param_in_ci(kf, first_epi_day)
             ),
+            "crps_first_epi_day": posterior_checks.crps(kf, first_epi_day),
         },
         index=[0],
     )
