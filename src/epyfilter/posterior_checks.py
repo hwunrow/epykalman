@@ -4,6 +4,7 @@ import numpy as np
 def check_param_in_ci(kf, day, percentile=95):
     """
     Check if the parameter estimate falls within the credible interval.
+    Evaluates on day.
 
     Args:
         kf (object): The EnsembleAdjustmentKalmanFilter object.
@@ -34,6 +35,7 @@ def check_param_in_ci(kf, day, percentile=95):
 def crps(kf, day):
     """
     Calculate the Continuous Ranked Probability Score (CRPS).
+    Evaluates on day.
 
     Parameters:
         kf (object): The EnsembleAdjustmentKalmanFilter object.
@@ -57,6 +59,7 @@ def crps(kf, day):
 def compute_ens_var(kf, day):
     """
     Compute the ensemble variance of parameter estimates.
+    Evaluates on day.
 
     Args:
         kf (object): The EnsembleAdjustmentKalmanFilter object.
@@ -80,6 +83,7 @@ def compute_ens_var(kf, day):
 def avg_kl_divergence(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
     """
     Compute the average Kullback-Leibler divergence.
+    Evaluates up to day and averages over time.
 
     Args:
         kf (object): The EnsembleAdjustmentKalmanFilter object.
@@ -115,6 +119,7 @@ def avg_kl_divergence(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins
 def avg_wasserstein2(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
     """
     Compute the average Wasserstein-2 distance.
+    Evaluates up to day and averages over time.
 
     Args:
         kf (object): The EnsembleAdjustmentKalmanFilter object.
@@ -149,6 +154,7 @@ def avg_wasserstein2(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins=
 def avg_kl_divergence_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
     """
     Compute the average Kullback-Leibler divergence for EnsembleSquareRootSmoother.
+    Evaluates up to day and averages over time.
 
     Args:
         ks (object): The EnsembleSquareRootSmoother object.
@@ -184,6 +190,7 @@ def avg_kl_divergence_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_b
 def avg_wasserstein2_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
     """
     Compute the average Wasserstein-2 distance for EnsembleSquareRootSmoother.
+    Evaluates up to day and averages over time.
 
     Args:
         ks (object): The EnsembleSquareRootSmoother object.
@@ -219,6 +226,7 @@ def avg_wasserstein2_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_bi
 def compute_ens_var_ks(ks, day):
     """
     Compute the ensemble variance of parameter estimates for EnsembleSquareRootSmoother.
+    Evaluates on day.
 
     Args:
         ks (object): The EnsembleSquareRootSmoother object.
@@ -240,6 +248,7 @@ def compute_ens_var_ks(ks, day):
 def check_param_in_ci_ks(ks, day, percentile=95):
     """
     Check if the parameter estimate falls within the confidence interval for EnsembleSquareRootSmoother.
+    Evaluates on day.
 
     Args:
         ks (object): The EnsembleSquareRootSmoother object.
@@ -320,6 +329,7 @@ def wasserstein2(p_sample, q_sample, num_bins=10):
 def data_rmse(kf, last_epi_day=None, last_epi=False):
     """
     Compute the root mean square error (RMSE) between the data and case counts posterior.
+    Evaluates up to day and averages over time.
 
     Args:
         kf (object): The EnsembleAdjustmentKalmanFilter object.
@@ -336,7 +346,6 @@ def data_rmse(kf, last_epi_day=None, last_epi=False):
     else:
         i_kf = np.array([x.i for x in kf.x_list])
         rmse = np.sqrt(np.mean((i_kf.T - kf.data.i[1 : len(i_kf) + 1]) ** 2, axis=0))
-        spread = np.sqrt(np.var(i_kf, axis=1))
 
     return np.mean(rmse)
 
@@ -344,6 +353,7 @@ def data_rmse(kf, last_epi_day=None, last_epi=False):
 def rt_rmse(kf, last_epi=False, peaks=None):
     """
     Compute the root mean square error (RMSE) between the truth and Rt posterior.
+    Evaluates up to day and averages over time. If peaks, just evalutes on peak day(s).
 
     Args:
         kf (object): The EnsembleAdjustmentKalmanFilter object.
