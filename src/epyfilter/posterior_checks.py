@@ -80,15 +80,16 @@ def compute_ens_var(kf, day):
             return np.var(np.asarray([θ.beta * θ.t_I for θ in kf.θ_list])[day])
 
 
-def avg_kl_divergence(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
+def avg_kl_divergence(kf, day=None, evaluate_on=False, min_i=100, num_bins=10):
     """
     Compute the average Kullback-Leibler divergence.
     Evaluates up to day and averages over time.
+    Evaluates on day if evaluate_on=True.
 
     Args:
         kf (object): The EnsembleAdjustmentKalmanFilter object.
-        last_epi (bool, optional): If True, computes only for days up to last_epi_day.
-        last_epi_day (int, optional): Last day of the second epidemic. Defaults to None.
+        day (int, optional): Day to evaluate up to/ on. Defaults to None.
+        evaluate_on(bool, optional): If True, evaluates on day. Defaults to False.
         min_i (int, optional): Minimum number of infected individuals to consider. Defaults to 100.
         num_bins (int, optional): Number of bins for histogram. Defaults to 10.
 
@@ -101,11 +102,14 @@ def avg_kl_divergence(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins
 
     kl_list = []
     days = np.where(kf.data.i_true >= min_i)[0]
-    if last_epi:
+    if day:
         # compute only for days less than the day when the second epidemic ends
-        assert isinstance(last_epi_day, int), "peaks must be integer"
-        last_epi_day = min(last_epi_day, kf.data.n_t - 1)
-        days = days[days <= last_epi_day]
+        assert isinstance(day, int), "peaks must be integer"
+        day = min(day, kf.data.n_t - 1)
+        days = days[days <= day]
+
+    if evaluate_on:
+        days = [day]
 
     for t in days:
         # Calculate KL divergence
@@ -116,15 +120,16 @@ def avg_kl_divergence(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins
     return np.mean(kl_list)
 
 
-def avg_wasserstein2(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
+def avg_wasserstein2(kf, day=None, evaluate_on=False, min_i=100, num_bins=10):
     """
     Compute the average Wasserstein-2 distance.
     Evaluates up to day and averages over time.
+    Evaluates on day if evaluate_on=True.
 
     Args:
         kf (object): The EnsembleAdjustmentKalmanFilter object.
-        last_epi (bool, optional): If True, computes only for days up to last_epi_day.
-        last_epi_day (int, optional): Last day of the second epidemic. Defaults to None.
+        day (int, optional): Day to evaluate up to/ on. Defaults to None.
+        evaluate_on(bool, optional): If True, evaluates on day. Defaults to False.
         min_i (int, optional): Minimum number of infected individuals to consider. Defaults to 100.
         num_bins (int, optional): Number of bins for histogram. Defaults to 10.
 
@@ -136,11 +141,14 @@ def avg_wasserstein2(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins=
         _, _, _, _ = kf.free_sim(betas)
     w2_list = []
     days = np.where(kf.data.i_true >= min_i)[0]
-    if last_epi:
+    if day:
         # compute only for days less than the day when the second epidemic ends
-        assert isinstance(last_epi_day, int), "peaks must be integer"
-        last_epi_day = min(last_epi_day, kf.data.n_t - 1)
-        days = days[days <= last_epi_day]
+        assert isinstance(day, int), "peaks must be integer"
+        day = min(day, kf.data.n_t - 1)
+        days = days[days <= day]
+
+    if evaluate_on:
+        days = [day]
 
     for t in days:
         # Calculate w2
@@ -151,15 +159,16 @@ def avg_wasserstein2(kf, last_epi=False, last_epi_day=None, min_i=100, num_bins=
     return np.mean(w2_list)
 
 
-def avg_kl_divergence_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
+def avg_kl_divergence_ks(ks, day=None, evaluate_on=False, min_i=100, num_bins=10):
     """
     Compute the average Kullback-Leibler divergence for EnsembleSquareRootSmoother.
     Evaluates up to day and averages over time.
+    Evaluates on day if evaluate_on=True.
 
     Args:
         ks (object): The EnsembleSquareRootSmoother object.
-        last_epi (bool, optional): If True, computes only for days up to last_epi_day.
-        last_epi_day (int, optional): Last day of the second epidemic. Defaults to None.
+        day (int, optional): Day to evaluate up to/ on. Defaults to None.
+        evaluate_on(bool, optional): If True, evaluates on day. Defaults to False.
         min_i (int, optional): Minimum number of infected individuals to consider. Defaults to 100.
         num_bins (int, optional): Number of bins for histogram. Defaults to 10.
 
@@ -173,11 +182,15 @@ def avg_kl_divergence_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_b
     kl_list = []
     days = np.where(ks.data.i_true >= min_i)[0]
     days = days[days < len(ks.θ_lag_list)]
-    if last_epi:
+    if day:
         # compute only for days less than the day when the second epidemic ends
-        assert isinstance(last_epi_day, int), "peaks must be integer"
-        last_epi_day = min(last_epi_day, ks.data.n_t - 1)
-        days = days[days <= last_epi_day]
+        assert isinstance(day, int), "peaks must be integer"
+        day = min(day, ks.data.n_t - 1)
+        days = days[days <= day]
+
+    if evaluate_on:
+        days = [day]
+
     for t in days:
         # Calculate KL divergence
         kl = kl_divergence(
@@ -187,15 +200,16 @@ def avg_kl_divergence_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_b
     return np.mean(kl_list)
 
 
-def avg_wasserstein2_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_bins=10):
+def avg_wasserstein2_ks(ks, day=None, evaluate_on=False, min_i=100, num_bins=10):
     """
     Compute the average Wasserstein-2 distance for EnsembleSquareRootSmoother.
     Evaluates up to day and averages over time.
+    Evaluates on day if evaluate_on=True.
 
     Args:
         ks (object): The EnsembleSquareRootSmoother object.
-        last_epi (bool, optional): If True, computes only for days up to last_epi_day.
-        last_epi_day (int, optional): Last day of the second epidemic. Defaults to None.
+        day (int, optional): Day to evaluate up to/ on. Defaults to None.
+        evaluate_on(bool, optional): If True, evaluates on day. Defaults to False.
         min_i (int, optional): Minimum number of infected individuals to consider. Defaults to 100.
         num_bins (int, optional): Number of bins for histogram. Defaults to 10.
 
@@ -209,11 +223,15 @@ def avg_wasserstein2_ks(ks, last_epi=False, last_epi_day=None, min_i=100, num_bi
     w2_list = []
     days = np.where(ks.data.i_true >= min_i)[0]
     days = days[days < len(ks.θ_lag_list)]
-    if last_epi:
+    if day:
         # compute only for days less than the day when the second epidemic ends
-        assert isinstance(last_epi_day, int), "peaks must be integer"
-        last_epi_day = min(last_epi_day, ks.data.n_t - 1)
-        days = days[days <= last_epi_day]
+        assert isinstance(day, int), "peaks must be integer"
+        day = min(day, ks.data.n_t - 1)
+        days = days[days <= day]
+
+    if evaluate_on:
+        days = [day]
+
     for t in days:
         # Calculate w2
         w2 = wasserstein2(
