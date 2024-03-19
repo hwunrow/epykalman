@@ -36,7 +36,7 @@ def compute_posterior_checks(kf, method_name, is_ks=False):
             "avg_kl_last_epi_day": (
                 posterior_checks.avg_kl_divergence_ks(kf, last_epi_day, evaluate_on=True)
                 if is_ks
-                else posterior_checks.avg_kl_divergence(kf, True, last_epi_day, evaluate_on=True)
+                else posterior_checks.avg_kl_divergence(kf, last_epi_day, evaluate_on=True)
             ),
             "in_ci_last_epi_day": (
                 posterior_checks.check_param_in_ci_ks(kf, last_epi_day)
@@ -204,7 +204,7 @@ if __name__ == "__main__":
 
     np.random.seed(1994)
 
-    files_per_task = 1
+    files_per_task = 50
     df = pd.read_csv(os.path.join(args.in_dir, args.param_file))
     start_row = (sge_task_id - 1) * files_per_task
     end_row = sge_task_id * files_per_task
