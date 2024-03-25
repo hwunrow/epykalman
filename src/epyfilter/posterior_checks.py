@@ -45,7 +45,9 @@ def crps(kf, day):
         crps_score (float): The CRPS score.
     """
     ensembles = np.array([x.i for x in kf.x_list])
-    ensembles = ensembles[day]
+    if day >= ensembles.shape[0]:
+        day = -1
+    ensembles = ensembles[day,:]
     observation = kf.data.i[day]
     hist, bins = np.histogram(ensembles, bins=len(np.unique(ensembles)))
     cdf = np.cumsum(hist/ensembles.shape[0])
@@ -185,7 +187,7 @@ def avg_kl_divergence_ks(ks, day=None, evaluate_on=False, min_i=100, num_bins=10
     if day:
         # compute only for days less than the day when the second epidemic ends
         assert isinstance(day, int), "peaks must be integer"
-        day = min(day, ks.data.n_t - 1)
+        day = min(day, ks.i_ppc.shape[0]-1)
         days = days[days <= day]
 
     if evaluate_on:
@@ -226,7 +228,7 @@ def avg_wasserstein2_ks(ks, day=None, evaluate_on=False, min_i=100, num_bins=10)
     if day:
         # compute only for days less than the day when the second epidemic ends
         assert isinstance(day, int), "peaks must be integer"
-        day = min(day, ks.data.n_t - 1)
+        day = min(day, ks.i_ppc.shape[0]-1)
         days = days[days <= day]
 
     if evaluate_on:
@@ -392,9 +394,9 @@ def rt_rmse(kf, last_epi=False, peaks=None):
     elif peaks is not None:
         # computes rmse on specific day(s)
         if isinstance(peaks, list):
-            peaks = [min(p, kf.data.n_t - 1) for p in peaks]
+            peaks = [min(p, rt_kf.shape[0] - 1) for p in peaks]
         elif isinstance(peaks, int):
-            peaks = min(peaks, kf.data.n_t - 1)
+            peaks = min(peaks, rt_kf.shape[0] - 1)
         else:
             raise ValueError("peaks must be a list or an integer")
 
