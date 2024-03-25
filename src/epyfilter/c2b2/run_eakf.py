@@ -200,11 +200,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--param-list", type=int, nargs="+", help="Rerunning for specific sge_task_ids"
     )
+    parser.add_argument(
+        "--files-per-task",
+        type=int,
+        default=50,
+        help="Number of files per array subjob"
+    )
     args = parser.parse_args()
 
     np.random.seed(1994)
 
-    files_per_task = 50
+    files_per_task = args.files_per_task
     df = pd.read_csv(os.path.join(args.in_dir, args.param_file))
     start_row = (sge_task_id - 1) * files_per_task
     end_row = sge_task_id * files_per_task
