@@ -366,4 +366,4 @@ if __name__ == "__main__":
         check_df.to_csv(f"{args.out_dir}/{param_num}_eakf_metrics.csv", index=True)
         logger.info(f"{param_num} saved csv")
 
-logger.info("DONE")
+    logger.info("DONE")
