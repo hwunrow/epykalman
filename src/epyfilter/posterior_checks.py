@@ -51,9 +51,9 @@ def crps(kf, day):
     observation = kf.data.i[day]
     hist, bins = np.histogram(ensembles, bins=len(np.unique(ensembles)))
     cdf = np.cumsum(hist/ensembles.shape[0])
-    crps_score = 0
-    for i, x in enumerate(bins[1:]):
-        crps_score += (cdf[i] - np.heaviside(x-observation, 0.5))**2 * (bins[i] - bins[i-1])
+    crps_scores = (cdf - np.heaviside(bins - observation, 0.5)[1:])**2 * np.diff(bins)
+    assert all(crps_scores >= 0.0), "CRPS scores must be non-negative"
+    crps_score = np.sum(crps_scores)
 
     return crps_score
 
