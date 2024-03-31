@@ -136,6 +136,7 @@ for (file in files) {
   merge_dt <- merge(percentile95_dt, percentile50_dt, by=c("window","day"))
   merge_dt <- merge(merge_dt, mean_dt, by=c("window","day"))
   merge_dt <- merge(merge_dt, med_dt, by=c("window","day"))
+  merge_dt$param <- param_num
   fwrite(merge_dt, file=paste0(out_dir,"/",param_num, "_epiEstim_for_plot.csv"))
   
   # posterior checks
@@ -164,6 +165,7 @@ for (file in files) {
     compute_ens_var(R_posterior_all_dt, first_epi_day, colname="ens_var_first_epi_day"),
     compute_crps(R_posterior_all_dt, first_epi_day, colname="crps_first_epi_day")
   ))
+  post_checks_dt$param <- param_num
   fwrite(post_checks_dt, file=paste0(out_dir,"/",param_num, "_epiEstim_metrics.csv"))
   
   if (plot) {
