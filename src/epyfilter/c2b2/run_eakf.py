@@ -195,7 +195,7 @@ if __name__ == "__main__":
         "--out-dir", type=str, required=True, help="Directory to save plots and files."
     )
     parser.add_argument(
-        "--param-file", type=str, required=True, help="CSV filename with params to run."
+        "--param-file", type=str, required=False, help="CSV filename with params to run."
     )
     parser.add_argument(
         "--param-list", type=int, nargs="+", help="Rerunning for specific sge_task_ids"
@@ -210,18 +210,22 @@ if __name__ == "__main__":
 
     np.random.seed(1994)
 
-    files_per_task = args.files_per_task
-    df = pd.read_csv(os.path.join(args.in_dir, args.param_file))
-    start_row = (sge_task_id - 1) * files_per_task
-    end_row = sge_task_id * files_per_task
-    if end_row < len(df):
-        pickle_files = df.iloc[start_row:end_row, 0]
-    else:
-        pickle_files = df.iloc[start_row:, 0]
+    if not args.param_file and not args.param_list:
+        raise ValueError("Must supply either param_file or param list")
 
-    pickle_files = [
-        os.path.join(args.pkl_dir, f"{p}_synthetic_data.pkl") for p in pickle_files
-    ]
+    if args.param_file:
+        files_per_task = args.files_per_task
+        df = pd.read_csv(os.path.join(args.in_dir, args.param_file))
+        start_row = (sge_task_id - 1) * files_per_task
+        end_row = sge_task_id * files_per_task
+        if end_row < len(df):
+            pickle_files = df.iloc[start_row:end_row, 0]
+        else:
+            pickle_files = df.iloc[start_row:, 0]
+
+        pickle_files = [
+            os.path.join(args.pkl_dir, f"{p}_synthetic_data.pkl") for p in pickle_files
+        ]
     # override if supplied param list
     if args.param_list:
         pickle_files = [
