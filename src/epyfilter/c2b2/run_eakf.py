@@ -13,68 +13,83 @@ from numpy.random import uniform
 
 
 def compute_posterior_checks(kf, method_name, is_ks=False):
-    kf_checks = pd.DataFrame(
-        {
-            "method": method_name,
-            "rt_rmse_up_to_last_epi_day": posterior_checks.rt_rmse(kf, True, last_epi_day),
-            "rt_rmse_last_epi_day": posterior_checks.rt_rmse(kf, False, last_epi_day),
-            "avg_w2_up_to_last_epi_day": (
-                posterior_checks.avg_wasserstein2_ks(kf, last_epi_day)
-                if is_ks
-                else posterior_checks.avg_wasserstein2(kf, last_epi_day)
-            ),
-            "avg_w2_last_epi_day": (
-                posterior_checks.avg_wasserstein2_ks(kf, last_epi_day, evaluate_on=True)
-                if is_ks
-                else posterior_checks.avg_wasserstein2(kf, last_epi_day, evaluate_on=True)
-            ),
-            "avg_kl_up_to_last_epi_day": (
-                posterior_checks.avg_kl_divergence_ks(kf, last_epi_day)
-                if is_ks
-                else posterior_checks.avg_kl_divergence(kf, last_epi_day)
-            ),
-            "avg_kl_last_epi_day": (
-                posterior_checks.avg_kl_divergence_ks(kf, last_epi_day, evaluate_on=True)
-                if is_ks
-                else posterior_checks.avg_kl_divergence(kf, last_epi_day, evaluate_on=True)
-            ),
-            "in_ci_last_epi_day": (
-                posterior_checks.check_param_in_ci_ks(kf, last_epi_day)
-                if is_ks
-                else posterior_checks.check_param_in_ci(kf, last_epi_day)
-            ),
-            "crps_last_epi_day": posterior_checks.crps(kf, last_epi_day),
-            "rt_rmse_up_to_first_epi_day": posterior_checks.rt_rmse(kf, True, first_epi_day),
-            "rt_rmse_first_epi_day": posterior_checks.rt_rmse(kf, False, first_epi_day),
-            "avg_w2_up_to_first_epi_day": (
-                posterior_checks.avg_wasserstein2_ks(kf, first_epi_day)
-                if is_ks
-                else posterior_checks.avg_wasserstein2(kf, first_epi_day)
-            ),
-            "avg_w2_first_epi_day": (
-                posterior_checks.avg_wasserstein2_ks(kf, first_epi_day, evaluate_on=True)
-                if is_ks
-                else posterior_checks.avg_wasserstein2(kf, first_epi_day, evaluate_on=True)
-            ),
-            "avg_kl_up_to_first_epi_day": (
-                posterior_checks.avg_kl_divergence_ks(kf, first_epi_day)
-                if is_ks
-                else posterior_checks.avg_kl_divergence(kf, first_epi_day)
-            ),
-            "avg_kl_first_epi_day": (
-                posterior_checks.avg_kl_divergence_ks(kf, first_epi_day, evaluate_on=True)
-                if is_ks
-                else posterior_checks.avg_kl_divergence(kf, first_epi_day, evaluate_on=True)
-            ),
-            "in_ci_first_epi_day": (
-                posterior_checks.check_param_in_ci_ks(kf, first_epi_day)
-                if is_ks
-                else posterior_checks.check_param_in_ci(kf, first_epi_day)
-            ),
-            "crps_first_epi_day": posterior_checks.crps(kf, first_epi_day),
-        },
-        index=[0],
-    )
+    if args.compute_kl_w2_time_series:
+        kf_checks = np.zeros((len(kf.x_list), 2))
+        if is_ks:
+            for day in range(len(kf.x_list)):
+                kf_checks[day,0] = posterior_checks.avg_kl_divergence_ks(kf, day, evaluate_on=True)
+                kf_checks[day,1] = posterior_checks.avg_wasserstein2_ks(kf, day, evaluate_on=True)
+        else:
+            for day in range(len(kf.x_list)):
+                kf_checks[day,0] = posterior_checks.avg_kl_divergence(kf, day, evaluate_on=True)
+                kf_checks[day,1] = posterior_checks.avg_wasserstein2(kf, day, evaluate_on=True)
+
+        kf_checks = pd.DataFrame(kf_checks, columns=["avg_kl", "avg_w2"])
+        kf_checks["method"] = method_name
+        kf_checks["day"] = range(len(kf.x_list))
+    else:
+        kf_checks = pd.DataFrame(
+            {
+                "method": method_name,
+                "rt_rmse_up_to_last_epi_day": posterior_checks.rt_rmse(kf, True, last_epi_day),
+                "rt_rmse_last_epi_day": posterior_checks.rt_rmse(kf, False, last_epi_day),
+                "avg_w2_up_to_last_epi_day": (
+                    posterior_checks.avg_wasserstein2_ks(kf, last_epi_day)
+                    if is_ks
+                    else posterior_checks.avg_wasserstein2(kf, last_epi_day)
+                ),
+                "avg_w2_last_epi_day": (
+                    posterior_checks.avg_wasserstein2_ks(kf, last_epi_day, evaluate_on=True)
+                    if is_ks
+                    else posterior_checks.avg_wasserstein2(kf, last_epi_day, evaluate_on=True)
+                ),
+                "avg_kl_up_to_last_epi_day": (
+                    posterior_checks.avg_kl_divergence_ks(kf, last_epi_day)
+                    if is_ks
+                    else posterior_checks.avg_kl_divergence(kf, last_epi_day)
+                ),
+                "avg_kl_last_epi_day": (
+                    posterior_checks.avg_kl_divergence_ks(kf, last_epi_day, evaluate_on=True)
+                    if is_ks
+                    else posterior_checks.avg_kl_divergence(kf, last_epi_day, evaluate_on=True)
+                ),
+                "in_ci_last_epi_day": (
+                    posterior_checks.check_param_in_ci_ks(kf, last_epi_day)
+                    if is_ks
+                    else posterior_checks.check_param_in_ci(kf, last_epi_day)
+                ),
+                "crps_last_epi_day": posterior_checks.crps(kf, last_epi_day),
+                "rt_rmse_up_to_first_epi_day": posterior_checks.rt_rmse(kf, True, first_epi_day),
+                "rt_rmse_first_epi_day": posterior_checks.rt_rmse(kf, False, first_epi_day),
+                "avg_w2_up_to_first_epi_day": (
+                    posterior_checks.avg_wasserstein2_ks(kf, first_epi_day)
+                    if is_ks
+                    else posterior_checks.avg_wasserstein2(kf, first_epi_day)
+                ),
+                "avg_w2_first_epi_day": (
+                    posterior_checks.avg_wasserstein2_ks(kf, first_epi_day, evaluate_on=True)
+                    if is_ks
+                    else posterior_checks.avg_wasserstein2(kf, first_epi_day, evaluate_on=True)
+                ),
+                "avg_kl_up_to_first_epi_day": (
+                    posterior_checks.avg_kl_divergence_ks(kf, first_epi_day)
+                    if is_ks
+                    else posterior_checks.avg_kl_divergence(kf, first_epi_day)
+                ),
+                "avg_kl_first_epi_day": (
+                    posterior_checks.avg_kl_divergence_ks(kf, first_epi_day, evaluate_on=True)
+                    if is_ks
+                    else posterior_checks.avg_kl_divergence(kf, first_epi_day, evaluate_on=True)
+                ),
+                "in_ci_first_epi_day": (
+                    posterior_checks.check_param_in_ci_ks(kf, first_epi_day)
+                    if is_ks
+                    else posterior_checks.check_param_in_ci(kf, first_epi_day)
+                ),
+                "crps_first_epi_day": posterior_checks.crps(kf, first_epi_day),
+            },
+            index=[0],
+        )
     return kf_checks
 
 
@@ -183,7 +198,10 @@ if __name__ == "__main__":
         help="Save reliablity for data and beta.",
     )
     parser.add_argument(
-        "--in-dir", type=str, required=True, help="Directory for inputs."
+        "--in-dir",
+        type=str,
+        required=True,
+        help="Directory for inputs."
     )
     parser.add_argument(
         "--pkl-dir",
@@ -192,7 +210,10 @@ if __name__ == "__main__":
         help="Directory for synthetic data inputs.",
     )
     parser.add_argument(
-        "--out-dir", type=str, required=True, help="Directory to save plots and files."
+        "--out-dir",
+        type=str,
+        required=True,
+        help="Directory to save plots and files."
     )
     parser.add_argument(
         "--param-file", type=str, required=False, help="CSV filename with params to run."
@@ -205,6 +226,11 @@ if __name__ == "__main__":
         type=int,
         default=50,
         help="Number of files per array subjob"
+    )
+    parser.add_argument(
+        "--compute-kl-w2-time-series",
+        action="store_true",
+        help="Special run to compute time series of kl and w2 metrics"
     )
     args = parser.parse_args()
 
@@ -364,8 +390,10 @@ if __name__ == "__main__":
             reliability_df.to_csv(
                 f"{args.out_dir}/{param_num}_reliability.csv", index=True
             )
-
-        check_df = check_df.groupby("method").mean()
+        if args.compute_kl_w2_time_series:
+            check_df = check_df.groupby(["method","day"]).mean().reset_index()
+        else:
+            check_df = check_df.groupby("method").mean()
         check_df["param"] = param_num
         check_df.to_csv(f"{args.out_dir}/{param_num}_eakf_metrics.csv", index=True)
         logger.info(f"{param_num} saved csv")
