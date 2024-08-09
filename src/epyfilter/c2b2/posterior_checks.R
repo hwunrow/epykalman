@@ -283,7 +283,7 @@ rt_rmse <- function(dt, dd=NULL, evaluate_on=FALSE, colname=NULL) {
   }
 }
 
-compute_crps <- function(dt, dd, colname) {
+compute_crps <- function(dt, dd, colname, ww=20) {
   # Calculate the Continuous Ranked Probability Score (CRPS).
   # Evaluates on day.
   
@@ -291,16 +291,17 @@ compute_crps <- function(dt, dd, colname) {
   #   dt (data.table): The EpiEstim posterior samples
   #   dd (int): The day for which to compute the crps
   #   colname (string): column name for output data table
+  #   ww (int): The window to check for the day and obs cutoff
   
   # Returns:
   #   crps_dt (data.table): The CRPS score by window
   
   dt_copy <- copy(dt)
-  dd <- min(dd, max(dt_copy[window==20, day]))
+  dd <- min(dd, max(dt_copy[window==ww, day]))
   samplecols <- paste0("sample", 1:300)
   samplecols <- c("window", samplecols)
   ensembles <- dt_copy[day==dd, samplecols, with=FALSE]
-  observation <- dt_copy[day==dd & window==20, i]
+  observation <- dt_copy[day==dd & window==ww, i]
   
   crps_score <- verification::crps(observation, ensembles)
   crps_dt <- data.table(window=unique(dt_copy$window), crps=crps_score$crps)
