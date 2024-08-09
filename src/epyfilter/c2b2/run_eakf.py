@@ -27,6 +27,19 @@ def compute_posterior_checks(kf, method_name, is_ks=False):
         kf_checks = pd.DataFrame(kf_checks, columns=["avg_kl", "avg_w2"])
         kf_checks["method"] = method_name
         kf_checks["day"] = range(len(kf.x_list))
+    elif args.compute_time_series:
+        kf_checks = np.zeros((len(kf.x_list), 3))
+        for day in range(len(kf.x_list)):
+            kf_checks[day,0] = posterior_checks.rt_rmse(kf, False, day)
+            kf_checks[day,1] = posterior_checks.crps(kf, day)
+            if is_ks:
+                kf_checks[day,2] = posterior_checks.check_param_in_ci_ks(kf, day)
+            else:
+                kf_checks[day,2] = posterior_checks.check_param_in_ci(kf, day)
+
+        kf_checks = pd.DataFrame(kf_checks, columns=["rt_rmse", "crps", "in_ci"])
+        kf_checks["method"] = method_name
+        kf_checks["day"] = range(len(kf.x_list))
     else:
         kf_checks = pd.DataFrame(
             {
@@ -232,6 +245,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Special run to compute time series of kl and w2 metrics"
     )
+    parser.add_argument(
+        "--compute-time-series",
+        action="store_true",
+        help="Special run to compute time series of rmse, crps, and reliability metrics"
+    )
     args = parser.parse_args()
 
     np.random.seed(1994)
@@ -390,7 +408,7 @@ if __name__ == "__main__":
             reliability_df.to_csv(
                 f"{args.out_dir}/{param_num}_reliability.csv", index=True
             )
-        if args.compute_kl_w2_time_series:
+        if args.compute_kl_w2_time_series or args.compute_time_series:
             check_df = check_df.groupby(["method","day"]).mean().reset_index()
         else:
             check_df = check_df.groupby("method").mean()
