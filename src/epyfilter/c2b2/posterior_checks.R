@@ -11,9 +11,9 @@ check_param_in_ci <- function(dt, dd, last_epi=FALSE, percentile = 95, colname=N
     if (!is.numeric(dd)) {
       stop("dd must be numeric")
     }
-    if (nrow(dt[day==dd]) < 20) {
+    if (max(dt[window==max(dt$window), day]) < dd) {
       # day is tooo late
-      dd <- max(dt[window==20, day])
+      dd <- max(dt[window==max(dt$window), day])
     }
     percentile_dt <- dt[day==dd, as.list(quantile(.SD, quantiles, na.rm=TRUE)),  .SDcols=paste0("sample", 1:300), by=.(window)]
     truth_dt <- dt[day==dd, .(window, rt)]
