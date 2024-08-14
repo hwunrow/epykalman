@@ -297,15 +297,39 @@ compute_crps <- function(dt, dd, colname, ww=20) {
   #   crps_dt (data.table): The CRPS score by window
   
   dt_copy <- copy(dt)
+  # Handle day out of bounds
   dd <- min(dd, max(dt_copy[window==ww, day]))
+  
+  # get observation and ensemble
   samplecols <- paste0("sample", 1:300)
-  samplecols <- c("window", samplecols)
   ensembles <- dt_copy[day==dd, samplecols, with=FALSE]
+  ensembles <- as.numeric(ensembles)
   observation <- dt_copy[day==dd & window==ww, i]
   
-  crps_score <- verification::crps(observation, ensembles)
-  crps_dt <- data.table(window=unique(dt_copy$window), crps=crps_score$crps)
+  hist_result <- hist(ensembles, breaks = length(unique(ensembles)), plot = FALSE)
+  bins <- hist_result$breaks
+  hist <- hist_result$counts
+  cdf <- cumsum(hist / length(ensembles))
+  
+  heaviside <- function(x) {
+    if (x > 0) {
+      return(1)
+    } else if (x == 0) {
+      return(0.5)
+    } else {
+      return(0)
+    }
+  }
+  heaviside <- Vectorize(heaviside)
+  
+  crps_scores <- (cdf - heaviside(bins - observation)[2:length(bins)])^2 * diff(bins)
+  # CRPS scores must be non-negative
+  stopifnot(all(crps_scores >= 0.0)) 
+  crps_score <- sum(crps_scores)
+  
+  crps_dt <- data.table(window=unique(dt_copy$window), crps=crps_score)
   setnames(crps_dt, "crps", colname)
+  
   return(crps_dt)
 }
 
