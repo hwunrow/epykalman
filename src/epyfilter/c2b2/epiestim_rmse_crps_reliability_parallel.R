@@ -10,6 +10,7 @@ library(ggplot2)
 library(EpiEstim)
 library(matrixStats)
 library(verification)
+library(parallel)
 source("/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/qsub.R")
 source("/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/posterior_checks.R")
 
@@ -17,7 +18,7 @@ source("/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/po
 parser <- ArgumentParser()
 parser$add_argument("--in-dir", help = "directory for external inputs", default = "/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/", type = "character")
 parser$add_argument("--data-dir", help = "directory for synthetic inputs", default = "/ifs/scratch/jls106_gp/nhw2114/data/20231106_synthetic_data/", type = "character")
-parser$add_argument("--out-dir", help = "directory for this steps checks", default = "/ifs/scratch/jls106_gp/nhw2114/data/20231106_synthetic_data/", type = "character")
+parser$add_argument("--out-dir", help = "directory for this steps checks", default = "/ifs/scratch/jls106_gp/nhw2114/data/20240809_epiestim_rmse_crps_reliability_day/", type = "character")
 parser$add_argument("--files-per-task", help = "number of files per array job", default = 10, type = "integer")
 parser$add_argument("--param-list", nargs='+', help = "rerun for specific params", type = "integer")
 parser$add_argument("--param-file", help = "file with list of parameters to run for array job", default = "good_param_list.csv", type = "character")
@@ -33,7 +34,7 @@ print(task_id)
 if (is.na(task_id)) {
   task_id <- 1
 }
-dt <- fread(file.path(in_dir, param_file))
+dt <- fread(file.path(out_dir, param_file))
 start_row <- (task_id - 1) * files_per_task + 1
 end_row <- task_id * files_per_task
 if (end_row < nrow(dt)) {
@@ -68,7 +69,6 @@ for (file in files) {
   time_window <- 8L
   
   # run epiestim
-  
   T <- nrow(synthetic_dt)
   t_start <- seq(3, T-(time_window-1))
   t_end <- t_start + time_window-1
@@ -113,51 +113,34 @@ for (file in files) {
   row$day <- 358
   R_posterior_all_dt <- rbind(R_posterior_all_dt, row)
   
-  post_checks_dt <- Reduce(function(x, y) merge(x, y, by = "window"), list(
-    rt_rmse(R_posterior_all_dt, last_epi_day, evaluate_on=FALSE, colname="rt_rmse_up_to_last_epi_day"),
-    rt_rmse(R_posterior_all_dt, last_epi_day, evaluate_on=TRUE, colname="rt_rmse_last_epi_day"),
-    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=last_epi_day, evaluate_on=FALSE, colname="avg_w2_up_to_last_epi_day"),
-    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=last_epi_day, evaluate_on=TRUE, colname="avg_w2_last_epi_day"),
-    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=last_epi_day, evaluate_on=FALSE, colname="avg_kl_up_to_last_epi_day"),
-    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=last_epi_day, evaluate_on=TRUE, colname="avg_kl_last_epi_day"),
-    check_param_in_ci(R_posterior_all_dt, last_epi_day, colname="in_ci_last_epi_day"),
-    compute_ens_var(R_posterior_all_dt, last_epi_day, colname="ens_var_last_epi_day"),
-    compute_crps(R_posterior_all_dt, last_epi_day, colname="crps_last_epi_day"),
-    rt_rmse(R_posterior_all_dt, first_epi_day, evaluate_on=FALSE, colname="rt_rmse_up_to_first_epi_day"),
-    rt_rmse(R_posterior_all_dt, first_epi_day, evaluate_on=TRUE, colname="rt_rmse_first_epi_day"),
-    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=first_epi_day, evaluate_on=FALSE, colname="avg_w2_up_to_first_epi_day"),
-    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=first_epi_day, evaluate_on=TRUE, colname="avg_w2_first_epi_day"),
-    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=first_epi_day, evaluate_on=FALSE, colname="avg_kl_up_to_first_epi_day"),
-    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=first_epi_day, evaluate_on=TRUE, colname="avg_kl_first_epi_day"),
-    check_param_in_ci(R_posterior_all_dt, first_epi_day, colname="in_ci_first_epi_day"),
-    compute_ens_var(R_posterior_all_dt, first_epi_day, colname="ens_var_first_epi_day"),
-    compute_crps(R_posterior_all_dt, first_epi_day, colname="crps_first_epi_day")
-  ))
-  
+  # rmse
   rmse_dt <- rbindlist(lapply(unique(R_posterior_all_dt$day), function(d) {
     rt_rmse(R_posterior_all_dt, d, evaluate_on=TRUE, colname="rmse")
   }))
   rmse_dt <- rmse_dt[rmse_dt$window == 8]
   rmse_dt$day <- unique(R_posterior_all_dt$day)
   
+  # reliability
   in_ci_dt <- rbindlist(lapply(unique(R_posterior_all_dt$day), function(d) {
     check_param_in_ci(R_posterior_all_dt, d, colname="in_ci")
   }))
   in_ci_dt <- in_ci_dt[in_ci_dt$window == 8]
   in_ci_dt$day <- unique(R_posterior_all_dt$day)
   
-  crps_dt <- rbindlist(lapply(unique(R_posterior_all_dt$day), function(d) {
-    compute_crps(R_posterior_all_dt, d, colname="crps", ww=8L)
+  # crps
+  i_ppc <- merge(i_ppc, synthetic_dt[, .(day, i)], by="day", how="left")
+  crps_dt <- rbindlist(lapply(unique(i_ppc$day), function(d) {
+    compute_crps(i_ppc, d, colname="crps", ww=8L)
   }))
   crps_dt <- crps_dt[crps_dt$window == 8]
-  crps_dt$day <- unique(R_posterior_all_dt$day)
-  
+  crps_dt$day <- unique(i_ppc$day)
   
   post_checks_dt <- merge(rmse_dt, in_ci_dt, by=c("window", "day"))
   post_checks_dt <- merge(post_checks_dt, crps_dt, by=c("window", "day"))
   
   post_checks_dt$param <- param_num
   fwrite(post_checks_dt, file=paste0(out_dir,"/",param_num, "_epiEstim_rmse_crps_reliability.csv"))
+  
   print(paste(format(Sys.time(), "%c"), "--", param_num, "finished"))
 }
 print("DONE!")
