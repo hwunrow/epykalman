@@ -47,15 +47,33 @@ def crps(kf, day):
     ensembles = np.array([x.i for x in kf.x_list])
     if day >= ensembles.shape[0]:
         day = -1
-    ensembles = ensembles[day,:]
-    observation = kf.data.i[day]
-    hist, bins = np.histogram(ensembles, bins=len(np.unique(ensembles)))
-    cdf = np.cumsum(hist/ensembles.shape[0])
-    crps_scores = (cdf - np.heaviside(bins - observation, 0.5)[1:])**2 * np.diff(bins)
-    assert all(crps_scores >= 0.0), "CRPS scores must be non-negative"
-    crps_score = np.sum(crps_scores)
-
-    return crps_score
+    ensembles = np.sort(ensembles[day,:])
+    obs = kf.data.i[day]
+    m = len(ensembles)
+    if obs < ensembles[0]:
+        cdf_obs = np.ones(m)
+        cdf = np.linspace(0,(m-1)/m,m)
+        all_mem = np.insert(ensembles,0,obs)  # prepend obs
+        delta_fc= np.diff(all_mem)
+    elif obs > ensembles[-1]:
+        cdf_obs = np.zeros(m)
+        cdf = np.linspace(1/m,1,m)
+        all_mem = np.append(ensembles,obs)  # append obs
+        delta_fc= np.diff(all_mem)
+    elif obs in ensembles:
+        cdf_obs = ensembles >= obs
+        cdf = np.linspace(1/m,1,m)
+        all_mem = ensembles
+        delta_fc= np.append(np.diff(all_mem), 0)
+    else:
+        cdf_obs = np.heaviside(ensembles - obs, 0.5)
+        cdf = np.linspace(1/m,(m-1)/m,m-1)
+        idx = np.where(cdf_obs == 1.)[0][0]
+        cdf = np.insert(cdf, idx, cdf[idx-1])
+        all_mem = np.sort(np.append(ensembles, obs))
+        delta_fc = np.diff(all_mem)
+    crps = np.sum(np.array((cdf - cdf_obs) ** 2)*delta_fc)
+    return crps
 
 
 def compute_ens_var(kf, day):
