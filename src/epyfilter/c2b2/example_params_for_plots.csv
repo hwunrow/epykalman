@@ -1,16 +1,16 @@
-method,in_ci_last_epi_day,rt_last_epi_day_rmse,avg_w2_last_epi_day,avg_kl_last_epi_day,example
-adaptive inflation,4,121652,14692,44036,max
-fixed inflation,17,14693,187781,151769,max
-no inflation,2634,51398,137894,137894,max
-smooth inflation,11,121655,121655,44039,max
-epiestim,7,169287,68787,68787,max
-adaptive inflation,136,53004,5284,9624,min
-fixed inflation,65,107709,170761,155505,min
-no inflation,2,85710,58230,178134,min
-smooth inflation,139,179391,138603,17551,min
-epiestim,367,380007,876727,504207,min
-adaptive inflation,0,17837,17260,12649,mean
-fixed inflation,49712,93422,51475,54487,mean
-no inflation,96509,98664,138052,121894,mean
-smooth inflation,144104,171821,151930,179935,mean
-epiestim,21258,43775,55741,36206,mean
+method,avg_kl_up_to_last_epi_day,avg_w2_up_to_last_epi_day,rt_rmse_up_to_last_epi_day,example
+adaptive inflation,84085.0,100185.0,98225.0,max
+fixed inflation,100185.0,96712.0,100184.0,max
+no inflation,89158.0,81071.0,99368.0,max
+smooth inflation,98225.0,98225.0,98225.0,max
+epiestim,97443.0,97443.0,91703.0,max
+adaptive inflation,47047.0,47047.0,190.0,min
+fixed inflation,44331.0,62143.0,1321.0,min
+no inflation,22090.0,62144.0,2.0,min
+smooth inflation,52218.0,52218.0,53.0,min
+epiestim,3457.0,40183.0,3497.0,min
+adaptive inflation,8499.0,40215.0,45181.0,mean
+fixed inflation,31883.0,25010.0,84260.0,mean
+no inflation,58063.0,54389.0,43912.0,mean
+smooth inflation,47735.0,10532.0,89106.0,mean
+epiestim,45028.0,46714.0,15658.0,mean

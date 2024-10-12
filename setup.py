@@ -6,7 +6,7 @@ version = "1.0.0"
 description = "Estimate Time-varying Reproduction Number using Ensemble Adjustment Kalman Filter using adaptive inflation"
 author = "Han Yong Wunrow"
 author_email = "nhw2114@columbia.edu"
-url = "https://github.com/hwunrow/rt-estimation"
+url = "https://github.com/hwunrow/epyfilter"
 license = "MIT"
 
 # Define your project's dependencies

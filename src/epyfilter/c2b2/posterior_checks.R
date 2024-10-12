@@ -11,9 +11,9 @@ check_param_in_ci <- function(dt, dd, last_epi=FALSE, percentile = 95, colname=N
     if (!is.numeric(dd)) {
       stop("dd must be numeric")
     }
-    if (nrow(dt[day==dd]) < 20) {
+    if (max(dt[window==max(dt$window), day]) < dd) {
       # day is tooo late
-      dd <- max(dt[window==20, day])
+      dd <- max(dt[window==max(dt$window), day])
     }
     percentile_dt <- dt[day==dd, as.list(quantile(.SD, quantiles, na.rm=TRUE)),  .SDcols=paste0("sample", 1:300), by=.(window)]
     truth_dt <- dt[day==dd, .(window, rt)]
@@ -24,7 +24,8 @@ check_param_in_ci <- function(dt, dd, last_epi=FALSE, percentile = 95, colname=N
       return(percentile_dt[, .SD, .SDcols = c("window", colname)])
     } else {
       percentile_dt[, in_ci := `2.5%` <= rt & rt <= `97.5%`]
-      return(percentile_dt[, .(window, in_ci)])
+      names(percentile_dt)[names(percentile_dt) == 'in_ci'] <- colname
+      return(percentile_dt[, .SD, .SDcols = c("window", colname)])
     }
   }
 }
@@ -43,14 +44,9 @@ compute_ens_var <- function(dt, dd, last_epi=FALSE, colname=NULL) {
       # day is tooo late
       dd <- max(dt[window==20, day])
     }
-    if (last_epi) {
-      return_dt <- dt[day==dd, rowVars(as.matrix(.SD), na.rm=TRUE), .SDcols=samplecols, by=window]
-      setnames(return_dt, "V1", colname)
-      return(return_dt)
-    } else {
-      return(dt[day==dd, .(ens_var=rowVars(as.matrix(.SD), na.rm=TRUE)),
-               .SDcols=samplecols, by=window])
-    }
+    return_dt <- dt[day==dd, rowVars(as.matrix(.SD), na.rm=TRUE), .SDcols=samplecols, by=window]
+    setnames(return_dt, "V1", colname)
+    return(return_dt)
   }
 }
 
@@ -91,12 +87,27 @@ kl_divergence <- function(p_sample, q_sample, epsilon=1e-10, num_bins=10) {
   return(sum(p_safe * log(p_safe / q_safe)))
 }
 
-avg_kl_divergence <- function(dt, synthetic_dt, data_dt, i_ppc, last_epi=FALSE, last_epi_day = NULL, min_i = 100, num_bins = 10, colname=NULL) {
+avg_kl_divergence <- function(
+    dt,
+    synthetic_dt,
+    data_dt,
+    i_ppc,
+    dd = NULL,
+    evaluate_on = FALSE,
+    min_i = 100,
+    num_bins = 10,
+    colname=NULL) {
   days <- synthetic_dt[i >= min_i, day]
-  if (last_epi) {
-    # compute only for days less than the day when the second epidemic ends
-    days <- days[days <= last_epi_day]
+  
+  if (!is.null(dd)) {
+    dd <- min(dd, max(dt[window==20, day]))
+    days <- days[days <= dd]
   }
+  
+  if (evaluate_on) {
+    days = c(dd)
+  }
+  
   samplecols <- paste0("sample", 1:300)
   
   avg_kl_window <- function(w) {
@@ -113,12 +124,8 @@ avg_kl_divergence <- function(dt, synthetic_dt, data_dt, i_ppc, last_epi=FALSE, 
   
   dt_return <- rbindlist(lapply(unique(dt$window), avg_kl_window))
   
-  if (last_epi) {
-    names(dt_return)[names(dt_return) == 'avg_kl'] <- colname
-    return(dt_return)
-  } else {
-    return(dt_return)
-  }
+  names(dt_return)[names(dt_return) == 'avg_kl'] <- colname
+  return(dt_return)
 }
 
 
@@ -151,12 +158,17 @@ wasserstein2 <- function(p_sample, q_sample, num_bins = 10) {
 }
 
 
-avg_wasserstein2 <- function(dt, synthetic_dt, data_dt, i_ppc, last_epi=FALSE, last_epi_day = NULL, min_i = 100, num_bins = 10, colname=NULL) {
+avg_wasserstein2 <- function(dt, synthetic_dt, data_dt, i_ppc, dd=NULL, evaluate_on=FALSE, min_i = 100, num_bins = 10, colname=NULL) {
   days <- synthetic_dt[i >= min_i, day]
-  if (last_epi) {
-    # compute only for days less than the day when the second epidemic ends
-    days <- days[days <= last_epi_day]
+  if (!is.null(dd)) {
+    dd <- min(dd, max(dt[window==20, day]))
+    days <- days[days <= dd]
   }
+  
+  if (evaluate_on) {
+    days = c(dd)
+  }
+  
   samplecols <- paste0("sample", 1:300)
   
   avg_w2_window <- function(w) {
@@ -172,13 +184,8 @@ avg_wasserstein2 <- function(dt, synthetic_dt, data_dt, i_ppc, last_epi=FALSE, l
   }
   dt_return <- rbindlist(lapply(unique(dt$window), avg_w2_window))
   
-  if (last_epi) {
-    names(dt_return)[names(dt_return) == 'avg_w2'] <- colname
-    return(dt_return)
-  } else {
-    return(dt_return)
-  }
-  
+  names(dt_return)[names(dt_return) == 'avg_w2'] <- colname
+  return(dt_return)
 }
 
 free_sim <- function(beta_dt, synthetic_dt) {
@@ -249,30 +256,89 @@ data_rmse <- function(dt, synthetic_dt, dd=NULL, last_epi=FALSE, colname=NULL) {
   return(list(rmse_dt = i_dt[, .(data_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window], i_ppc = i_ppc))
 }
 
-rt_rmse <- function(dt, dd=NULL, last_epi=FALSE, colname=NULL) {
+rt_rmse <- function(dt, dd=NULL, evaluate_on=FALSE, colname=NULL) {
   dt_copy <- copy(dt)
   samplecols <- paste0("sample", 1:300)
   dt_copy$sqdiff <- rowMeans((dt_copy$rt - dt_copy[, samplecols, with=FALSE])^2)
   
-  if (last_epi) {
-    # compute rmse from day 1 until the last day of the second epidemic
+  if (is.null(dd)) {
+    # average across entire time series
+    return(dt_copy[, .(colname=sqrt(mean(sqdiff, na.rm=TRUE))), by=window])
+  }
+  
+  # day dd should be smaller than the last eval in the window
+  dd <- min(dd, max(dt_copy[window==20, day]))
+  
+  if (evaluate_on) {
+    # compute rmse on dd
+    result_dt <- dt_copy[day == dd, sqrt(mean(sqdiff, na.rm=TRUE)), by=window]
+    setnames(result_dt, "V1", colname)
+    return(result_dt)
+  }
+  else {
+    # compute rmse from day 1 until dd
     result_dt <- dt_copy[day <= dd, sqrt(mean(sqdiff, na.rm=TRUE)), by=window]
     setnames(result_dt, "V1", colname)
     return(result_dt)
   }
+}
+
+compute_crps <- function(dt, dd, colname, ww=20) {
+  # Calculate the Continuous Ranked Probability Score (CRPS).
+  # Evaluates on day.
   
-  if (is.null(dd)) {
-    return(dt_copy[, .(rt_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window])
+  # Parameters:
+  #   dt (data.table): The EpiEstim posterior samples
+  #   dd (int): The day for which to compute the crps
+  #   colname (string): column name for output data table
+  #   ww (int): The window to check for the day and obs cutoff
+  
+  # Returns:
+  #   crps_dt (data.table): The CRPS score by window
+  
+  dt_copy <- copy(dt)
+  # Handle day out of bounds
+  dd <- min(dd, max(dt_copy[window==ww, day]))
+  m <- sum(grepl("^sample", colnames(dt_copy)))
+  
+  # get observation and ensemble
+  samplecols <- paste0("sample", 1:m)
+  ensembles <- dt_copy[day==dd, samplecols, with=FALSE]
+  ensembles <- as.numeric(ensembles)
+  ensembles <- sort(ensembles)
+  obs <- dt_copy[day==dd & window==ww, i]
+  
+  # Handle different cases based on 'obs' position relative to 'ensembles'
+  if (obs < ensembles[1]) {
+    cdf_obs <- rep(1, m)
+    cdf <- seq(0, (m - 1) / m, length.out = m)
+    all_mem <- c(obs, ensembles) 
+    delta_fc <- diff(all_mem)
+  } else if (obs > ensembles[m]) {
+    cdf_obs <- rep(0, m)
+    cdf <- seq(1 / m, 1, length.out = m)
+    all_mem <- c(ensembles, obs) 
+    delta_fc <- diff(all_mem)
+  } else if (obs %in% ensembles) {
+    cdf_obs <- as.numeric(ensembles >= obs)
+    cdf <- seq(1 / m, 1, length.out = m)
+    all_mem <- ensembles
+    delta_fc <- c(diff(all_mem), 0)
   } else {
-    if (all(dd %in% unique(dt_copy$day))) {
-      # all peaks in dt
-      return(dt_copy[day %in% dd, .(rt_peak_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window])
-    } else if (dd[1] %in% unique(dt_copy$day)) {
-      # first peak in dt
-      return(dt_copy[day == dd[1], .(rt_peak_rmse=sqrt(mean(sqdiff, na.rm=TRUE))), by=window])
-    } else {
-      return(NA)
-    }
+    cdf_obs <- as.numeric(ensembles >= obs) 
+    cdf <- seq(1 / m, (m - 1) / m, length.out = m - 1)
+    idx <- which(cdf_obs == 1)[1]
+    cdf <- c(cdf[1:(idx - 1)], cdf[idx - 1], cdf[idx:length(cdf)]) 
+    all_mem <- sort(c(ensembles, obs))
+    delta_fc <- diff(all_mem)
   }
+  
+  # Calculate and return CRPS
+  crps_score <- sum((cdf - cdf_obs)^2 * delta_fc)
+  
+  crps_dt <- data.table(window=unique(dt_copy$window), crps=crps_score)
+  setnames(crps_dt, "crps", colname)
+  
+  return(crps_dt)
 }
 

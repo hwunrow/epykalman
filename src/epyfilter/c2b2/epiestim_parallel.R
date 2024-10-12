@@ -9,13 +9,14 @@ library(data.table)
 library(ggplot2)
 library(EpiEstim)
 library(matrixStats)
+library(verification)
 source("/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/qsub.R")
 source("/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/posterior_checks.R")
 
 # Get arguments from parser
 parser <- ArgumentParser()
 parser$add_argument("--in-dir", help = "directory for external inputs", default = "/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/", type = "character")
-parser$add_argument("--data-dir", help = "directory for synthetic inputs", default = "/ifs/scratch/jls106_gp/nhw2114/data/20231025_synthetic_data/", type = "character")
+parser$add_argument("--data-dir", help = "directory for synthetic inputs", default = "/ifs/scratch/jls106_gp/nhw2114/data/20231106_synthetic_data/", type = "character")
 parser$add_argument("--out-dir", help = "directory for this steps checks", default = "/ifs/scratch/jls106_gp/nhw2114/data/20231106_synthetic_data/", type = "character")
 parser$add_argument("--files-per-task", help = "number of files per array job", default = 10, type = "integer")
 parser$add_argument("--param-list", nargs='+', help = "rerun for specific params", type = "integer")
@@ -46,13 +47,13 @@ if (length(param_list) != 0) {
   print(pickle_files)
 }
 
-files <- paste0(out_dir, pickle_files$param, "_for_epiestim.csv")
-
+files <- paste0(data_dir, pickle_files$param, "_for_epiestim.csv")
 last_epidemic_days = fread(paste0(in_dir,"compute_days.csv"))
 
 for (file in files) {
   param_num <- strsplit(basename(file), "_")[[1]][1]
   last_epi_day <- last_epidemic_days[param == param_num]$last_epi_day
+  first_epi_day <- last_epidemic_days[param == param_num]$first_epi_day
   late_day <- last_epidemic_days[param == param_num]$late_day
   peaks <- c(last_epidemic_days[param == param_num]$peak1, last_epidemic_days[param == param_num]$peak2)
   
@@ -135,6 +136,7 @@ for (file in files) {
   merge_dt <- merge(percentile95_dt, percentile50_dt, by=c("window","day"))
   merge_dt <- merge(merge_dt, mean_dt, by=c("window","day"))
   merge_dt <- merge(merge_dt, med_dt, by=c("window","day"))
+  merge_dt$param <- param_num
   fwrite(merge_dt, file=paste0(out_dir,"/",param_num, "_epiEstim_for_plot.csv"))
   
   # posterior checks
@@ -142,35 +144,28 @@ for (file in files) {
   rmse_dt <- data_rmse_result$rmse_dt
   i_ppc <- data_rmse_result$i_ppc
   
+  print("posterior checks")
   post_checks_dt <- Reduce(function(x, y) merge(x, y, by = "window"), list(
-    rt_rmse(R_posterior_all_dt, peaks),
-    rt_rmse(R_posterior_all_dt),
-    rt_rmse(R_posterior_all_dt, last_epi_day, last_epi=TRUE, colname="rt_rmse_last_epi_day"),
-    rt_rmse(R_posterior_all_dt, last_epi_day - 1, last_epi=TRUE, colname="rt_rmse_before_last_epi_day"),
-    rt_rmse(R_posterior_all_dt, last_epi_day + 1, last_epi=TRUE, colname="rt_rmse_after_last_epi_day"),
-    rmse_dt,
-    data_rmse(R_posterior_all_dt, synthetic_dt, last_epi_day, last_epi=TRUE, colname="data_rmse_last_epi_day"),
-    data_rmse(R_posterior_all_dt, synthetic_dt, last_epi_day - 1, last_epi=TRUE, colname="data_rmse_before_last_epi_day"),
-    data_rmse(R_posterior_all_dt, synthetic_dt, last_epi_day + 1, last_epi=TRUE, colname="data_rmse_after_last_epi_day"),
-    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc),
-    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc),
-    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day, colname="avg_w2_last_epi_day"),
-    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day - 1, colname="avg_w2_before_last_epi_day"),
-    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day + 1, colname="avg_w2_after_last_epi_day"),
-    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day, colname="avg_kl_last_epi_day"),
-    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day - 1, colname="avg_kl_before_last_epi_day"),
-    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, last_epi=TRUE, last_epi_day=last_epi_day + 1, colname="avg_kl_after_last_epi_day"),
-    check_param_in_ci(R_posterior_all_dt, late_day),
-    compute_ens_var(R_posterior_all_dt, late_day),
-    check_param_in_ci(R_posterior_all_dt, "last"),
-    compute_ens_var(R_posterior_all_dt, "last"),
-    check_param_in_ci(R_posterior_all_dt, last_epi_day, last_epi=TRUE, colname="in_ci_last_epi_day"),
-    check_param_in_ci(R_posterior_all_dt, last_epi_day - 1, last_epi=TRUE, colname="in_ci_before_last_epi_day"),
-    check_param_in_ci(R_posterior_all_dt, last_epi_day + 1, last_epi=TRUE, colname="in_ci_after_last_epi_day"),
-    compute_ens_var(R_posterior_all_dt, last_epi_day, last_epi=TRUE, colname="ens_var_last_epi_day"),
-    compute_ens_var(R_posterior_all_dt, last_epi_day - 1, last_epi=TRUE, colname="ens_var_before_last_epi_day"),
-    compute_ens_var(R_posterior_all_dt, last_epi_day + 1, last_epi=TRUE, colname="ens_var_after_last_epi_day")
+    rt_rmse(R_posterior_all_dt, last_epi_day, evaluate_on=FALSE, colname="rt_rmse_up_to_last_epi_day"),
+    rt_rmse(R_posterior_all_dt, last_epi_day, evaluate_on=TRUE, colname="rt_rmse_last_epi_day"),
+    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=last_epi_day, evaluate_on=FALSE, colname="avg_w2_up_to_last_epi_day"),
+    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=last_epi_day, evaluate_on=TRUE, colname="avg_w2_last_epi_day"),
+    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=last_epi_day, evaluate_on=FALSE, colname="avg_kl_up_to_last_epi_day"),
+    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=last_epi_day, evaluate_on=TRUE, colname="avg_kl_last_epi_day"),
+    check_param_in_ci(R_posterior_all_dt, last_epi_day, colname="in_ci_last_epi_day"),
+    compute_ens_var(R_posterior_all_dt, last_epi_day, colname="ens_var_last_epi_day"),
+    compute_crps(R_posterior_all_dt, last_epi_day, colname="crps_last_epi_day"),
+    rt_rmse(R_posterior_all_dt, first_epi_day, evaluate_on=FALSE, colname="rt_rmse_up_to_first_epi_day"),
+    rt_rmse(R_posterior_all_dt, first_epi_day, evaluate_on=TRUE, colname="rt_rmse_first_epi_day"),
+    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=first_epi_day, evaluate_on=FALSE, colname="avg_w2_up_to_first_epi_day"),
+    avg_wasserstein2(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=first_epi_day, evaluate_on=TRUE, colname="avg_w2_first_epi_day"),
+    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=first_epi_day, evaluate_on=FALSE, colname="avg_kl_up_to_first_epi_day"),
+    avg_kl_divergence(R_posterior_all_dt, synthetic_dt, data_dt, i_ppc, dd=first_epi_day, evaluate_on=TRUE, colname="avg_kl_first_epi_day"),
+    check_param_in_ci(R_posterior_all_dt, first_epi_day, colname="in_ci_first_epi_day"),
+    compute_ens_var(R_posterior_all_dt, first_epi_day, colname="ens_var_first_epi_day"),
+    compute_crps(R_posterior_all_dt, first_epi_day, colname="crps_first_epi_day")
   ))
+  post_checks_dt$param <- param_num
   fwrite(post_checks_dt, file=paste0(out_dir,"/",param_num, "_epiEstim_metrics.csv"))
   
   if (plot) {
