@@ -153,10 +153,15 @@ def save_plots(kf, kf_no, kf_fixed, param_num, args):
 
 
 if __name__ == "__main__":
-    try:
+    if any(var in os.environ for var in ["SLURM_JOB_ID", "SLURM_ARRAY_TASK_ID"]):
+        sge_task_id = int(os.environ.get("SLURM_ARRAY_TASK_ID"))
+        slurm_submit_dir = os.environ.get("SLURM_SUBMIT_DIR")
+        slurm_job_id = os.environ.get("SLURM_JOB_ID")
+        sge_outputs_file = os.path.join(slurm_submit_dir, f"{slurm_job_id}.{sge_task_id}.out")
+    elif any(var in os.environ for var in ["JOB_ID", "SGE_TASK_ID"]): 
         sge_task_id = int(os.environ.get("SGE_TASK_ID"))
         sge_outputs_file = os.environ.get("SGE_STDOUT_PATH")
-    except Exception:
+    else:
         sge_task_id = 1
         sge_outputs_file = "test.log"
 
@@ -170,6 +175,7 @@ if __name__ == "__main__":
     )
     sg_outputs_handler.setFormatter(formatter)
     logger.addHandler(sg_outputs_handler)
+    print(sge_task_id)
 
     parser = argparse.ArgumentParser(
         description="Run EAKF with adaptive, fixed, and no inflation for 1000 different synthetic data sets",
