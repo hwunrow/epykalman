@@ -65,3 +65,9 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+*.mat
+src/epyfilter/plot/*.png
+src/epyfilter/plot/*.pdf
+src/epyfilter/plot/*.eps
+src/epyfilter/plot/*.csv
