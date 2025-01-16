@@ -1,5 +1,5 @@
 import numpy as np
-from epyfilter import inflation
+from epyfilter.eakf import inflation
 import matplotlib.pyplot as plt
 import pickle
 
@@ -105,9 +105,9 @@ class EnsembleAdjustmentKalmanFilter():
                         lam, lam_var = inflation.adaptive_inflation(
                             θ.beta, y, z, oev, lam, lam_var)
                         # if t > 100:
-                        lam = 0.98 * (lam - 1) + 1
-                        if t > late_day + 7:
-                            lam = 1.005
+                        # lam = 0.99 * (lam - 1) + 1
+                        # if t > late_day + 7:
+                        #     lam = 1.005
                         # lam_max = 1.15
                         # if lam > lam_max:
                         # #     lam = lam_max
@@ -124,7 +124,8 @@ class EnsembleAdjustmentKalmanFilter():
                             lam = lam_fixed
                             lam_S = lam_I = lam_R = lam_i = 1.01
                         else:
-                            lam = lam_S = lam_I = lam_R = lam_i = 1.
+                            lam = lam_fixed
+                            lam_S = lam_I = lam_R = lam_i = 1.
                     else:
                         lam = lam_S = lam_I = lam_R = lam_i = 1.
                     # if z > 0:
@@ -185,15 +186,19 @@ class EnsembleAdjustmentKalmanFilter():
         self.lam_var_list = np.array(lam_var_list)
         self.alpha_list = np.array(alpha_list)
 
-    def free_sim(self, beta):
+    def free_sim(self, beta, add_noise=False):
         S = np.array([self.data.S0 * np.ones(self.m)])
         Ir = np.array([self.data.I0 * np.ones(self.m)])
         R = np.array([np.zeros(self.m)])
         i = np.array([np.zeros(self.m)])
+        # S = self.x_list[0].S.reshape((1,self.m))
+        # Ir = self.x_list[0].I.reshape((1,self.m))
+        # R = self.x_list[0].R.reshape((1,self.m))
+        # i = self.x_list[0].i.reshape((1,self.m))
 
         for t in range(self.data.beta.shape[0]):
             if t < 10:
-                dSI = np.random.poisson(self.data.beta[t] * Ir[t] *
+                dSI = np.random.poisson(beta[10] * Ir[t] *
                                         S[t] / self.data.N)
             else:
                 dSI = np.random.poisson(beta[t]*Ir[t]*S[t]/self.data.N)
@@ -207,6 +212,14 @@ class EnsembleAdjustmentKalmanFilter():
             Ir = np.append(Ir, [I_new], axis=0)
             R = np.append(R, [R_new], axis=0)
             i = np.append(i, [dSI], axis=0)
+        
+        self.i_ppc_true = i
+        if add_noise:
+            i = i.astype("float64")
+            obs_error_var = np.maximum(1.0, i[1:] ** 2 * self.data.noise_param)
+            obs_error_sample = np.random.normal(0, 1, size=(self.data.n_t, self.m))
+            i[1:] += obs_error_sample * np.sqrt(obs_error_var)
+            i = np.clip(i, 0,self.data.N)
 
         self.i_ppc = i
 
@@ -215,13 +228,14 @@ class EnsembleAdjustmentKalmanFilter():
     def compute_reliability(self, percentiles):
         prop_list = []
         betas = np.asarray([θ.beta for θ in self.θ_list])
-        _, _, _, i = self.free_sim(betas)
+        if not hasattr(self, "i_ppc"):
+            self.free_sim(betas)
         for p in percentiles:
             lower = np.quantile(
-                i, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[0, :]
+                self.i_ppc, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[0, :]
             upper = np.quantile(
-                i, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[1, :]
-            pp = (lower <= self.data.i) & (self.data.i <= upper)
+                self.i_ppc, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[1, :]
+            pp = (lower[1:] <= self.data.i) & (self.data.i <= upper[1:])
             prop_list.append(np.mean(pp[np.where(self.data.i > 5)]))
         self.prop_list = prop_list
     

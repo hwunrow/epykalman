@@ -254,14 +254,15 @@ class EnsembleSquareRootSmoother:
     def compute_reliability(self, percentiles):
         prop_list = []
         betas = np.asarray([θ.beta for θ in self.θ_list])
-        _, _, _, i = self.free_sim(betas)
+        if not hasattr(self, 'i_ppc'):
+            self.free_sim(betas)
         for p in percentiles:
             lower = np.quantile(
-                i, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[0, :]
+                self.i_ppc, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[0, :]
             upper = np.quantile(
-                i, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[1, :]
-            pp = (lower <= self.data.i[:len(i)]) & (self.data.i[:len(i)] <= upper)
-            prop_list.append(np.mean(pp[np.where(self.data.i[:len(i)] > 5)]))
+                self.i_ppc, q=[(1-p/100)/2, 1-(1-p/100)/2], axis=1)[1, :]
+            pp = (lower <= self.data.i[:len(self.i_ppc)]) & (self.data.i[:len(self.i_ppc)] <= upper)
+            prop_list.append(np.mean(pp[np.where(self.data.i[:len(self.i_ppc)] > 5)]))
         self.prop_list = prop_list
     
     def compute_beta_reliability(self, percentiles):
@@ -280,15 +281,19 @@ class EnsembleSquareRootSmoother:
                 np.mean((lower <= beta_true[:len(betas_skip)]) & (beta_true[:len(betas_skip)] <= upper)))
         self.beta_prop_list = prop_list
 
-    def free_sim(self, beta):
+    def free_sim(self, beta, add_noise=False):
         S = np.array([self.data.S0 * np.ones(self.eakf.m)])
         Ir = np.array([self.data.I0 * np.ones(self.eakf.m)])
         R = np.array([np.zeros(self.eakf.m)])
         i = np.array([np.zeros(self.eakf.m)])
+        # S = self.x_list[0].S.reshape((1,self.eakf.m))
+        # Ir = self.x_list[0].I.reshape((1,self.eakf.m))
+        # R = self.x_list[0].R.reshape((1,self.eakf.m))
+        # i = self.x_list[0].i.reshape((1,self.eakf.m))
 
         for t in range(len(self.θ_lag_list)):
             if t < 10:
-                dSI = np.random.poisson(self.data.beta[t] * Ir[t] *
+                dSI = np.random.poisson(beta[10] * Ir[t] *
                                         S[t] / self.data.N)
             else:
                 dSI = np.random.poisson(beta[t]*Ir[t]*S[t]/self.data.N)
@@ -302,6 +307,14 @@ class EnsembleSquareRootSmoother:
             Ir = np.append(Ir, [I_new], axis=0)
             R = np.append(R, [R_new], axis=0)
             i = np.append(i, [dSI], axis=0)
+        
+        self.i_ppc_true = i
+        if add_noise:
+            i = i.astype("float64")
+            obs_error_var = np.maximum(1.0, i[1:] ** 2 * self.data.noise_param)
+            obs_error_sample = np.random.normal(0, 1, size=(len(self.x_list), self.eakf.m))
+            i[1:] += obs_error_sample * np.sqrt(obs_error_var)
+            i = np.clip(i, 0,self.data.N)
 
         self.i_ppc = i
 
