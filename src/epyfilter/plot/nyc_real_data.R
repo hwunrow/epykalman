@@ -1,26 +1,19 @@
 ################################################################################
 #' @Author: Han Yong Wunrow (nhw2114)
-#' @Description: Run EpiEstim to 
+#' @Description: Run EpiEstim on empirial data
 ################################################################################
 rm(list=ls())
-.libPaths("/ifs/home/jls106_gp/nhw2114/R/x86_64-pc-linux-gnu-library/4.3/")
 library(argparse)
 library(data.table)
 library(ggplot2)
 library(EpiEstim)
 library(matrixStats)
-library(verification)
-library(parallel)
-source("/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/qsub.R")
-source("/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/posterior_checks.R")
 
-
-START_DATE <- "2021-07-01"
-END_DATE <- "2022-03-01"
+START_DATE <- "2021-12-05"
+END_DATE <- "2022-07-01"
 TIME_WINDOW_SIZE <- 7
 NYC_FIPS <- 36061
 RAW_CASE_URL <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/refs/heads/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv"
-
 
 df <- fread(RAW_CASE_URL)
 df <- df[FIPS == NYC_FIPS]
@@ -53,9 +46,10 @@ time_window <- 8L
 t_start <- seq(3, t-(time_window-1))
 t_end <- t_start + time_window-1
 gamma <- 1/3.5
+alpha <- 0.28365230839069
 
 res <- estimate_R(
-  df_long[, c("7_Day_Avg_Daily_Cases")] / 0.35,
+  df_long[, c("7_Day_Avg_Daily_Cases")] / alpha,
   method="parametric_si",
   config=make_config(list(
     t_start = t_start,
@@ -64,6 +58,7 @@ res <- estimate_R(
     std_si = 1/gamma)))
 plot(res)
 r_dt <- res$R
+fwrite(r_dt, "/Users/hwunrow/Documents/GitHub/epyfilter/src/epyfilter/plot/nyc_real_data_epiestim_posterior.csv")
 
 # sample from posterior
 helper_sample_posterior <- function(x, R, n) {
@@ -71,131 +66,90 @@ helper_sample_posterior <- function(x, R, n) {
 }
 
 n_samples <- 300L
-sample_lists <- lapply(1:nrow(df_long), helper_sample_posterior, R=res, n=n_samples)
+sample_lists <- lapply(1:nrow(r_dt), helper_sample_posterior, R=res, n=n_samples)
 R_posterior_dt <- transpose(as.data.table(sample_lists))
 samplecols <- paste0("sample",1:n_samples)
 names(R_posterior_dt) <- samplecols
 R_posterior_dt$day <- r_dt$t_start
 R_posterior_dt$window <- time_window
-# divide by susceptible to get time-varying Rt
-R_posterior_dt <- merge(R_posterior_dt, synthetic_dt, by=c("day"))
-R_posterior_dt[ , (samplecols) := lapply(.SD, '/', prop_S), .SDcols = samplecols]
 
+# plot posterior draws and mean
+library(tidyr)
+library(dplyr)
 
+R_posterior_long <- R_posterior_dt %>% 
+  pivot_longer(cols = starts_with("sample"),
+               names_to = "sample",
+               values_to = "value")
+R_posterior_mean <- R_posterior_long %>% 
+  group_by(day) %>% 
+  summarize(mean_value = mean(value))
 
+ggplot() +
+  geom_line(data = R_posterior_long, aes(x = day, y = value, group = sample), color = "lightgray") +
+  geom_line(data = R_posterior_mean, aes(x = day, y = mean_value), color = "black") +
+  geom_line(data = r_dt, aes(x=t_start, y=`Mean(R)`), linetype = "dotdash", color="red")
+  theme_minimal() 
 
-### Split into two waves
-# delta
-time_window <- 8L
-t_start <- seq(2, 140-(time_window-1))
-t_end <- t_start + time_window-1
-res_before <- estimate_R(
-  df_long[, c("7_Day_Avg_Daily_Cases")],
-  method="parametric_si",
-  config=make_config(list(
-    t_start = t_start,
-    t_end = t_end,
-    mean_si = 1/gamma,
-    std_si = 1/gamma)))
+free_sim <- function(rt_dt, burn_in=3) {
+  m <- 300
+  N <- 1.596*10^6
+  S0 <- 0.33 * N
+  I0 <- 2000
+  
+  samplecols <- paste0("sample", 1:300)
+  free_sim_w <- function() {
+    S <- matrix(rep(S0,m), nrow = 1, ncol = m)
+    Ir <- matrix(rep(I0,m), nrow = 1, ncol = m)
+    i <- matrix(rep(0, m), nrow = 1, ncol = m)
+    
+    for (t in 1:max(rt_dt$day)) {
+      if (t < burn_in) {
+        re <- as.matrix(rt_dt[day == burn_in, ..samplecols])
+        dSI <- rpois(m, re * gamma * Ir[t,])
+      } else {
+        re <- as.matrix(rt_dt[day == t, ..samplecols])
+        dSI <- rpois(m, re * gamma * Ir[t,])
+      }
+      dIR <- rpois(m, Ir[t,] * gamma)
+      
+      S_new <- pmin(pmax(S[t, ] - dSI, 0), N)
+      I_new <- pmin(pmax(Ir[t, ] + dSI - dIR, 0), N)
+      
+      S <- rbind(S, S_new)
+      Ir <- rbind(Ir, I_new)
+      i <- rbind(i, dSI)
+    }
+    tmp_dt <- data.table(i)
+    colnames(tmp_dt) <- samplecols
+    tmp_dt$day <- 0:max(rt_dt$day)
+    
+    return(tmp_dt)
+  }
+  
+  i_ppc <- free_sim_w()
+  
+  return(i_ppc)
+}
 
-plot(res_before, "R")
+# df_long$day <- 1:nrow(df_long)
+# df_long[, cases_scaled := `7_Day_Avg_Daily_Cases` / alpha]
 
-# omicron
-time_window <- 8L
-t_start <- seq(141, t-(time_window-1))
-t_end <- t_start + time_window-1
-res_after <- estimate_R(
-  df_long[, c("7_Day_Avg_Daily_Cases")],
-  method="parametric_si",
-  config=make_config(list(
-    t_start = t_start,
-    t_end = t_end,
-    mean_si = 1/gamma,
-    std_si = 1/gamma)))
-
-plot(res_after, "R")
-
-
-
-# Run EpiEstim
-# for (file in files) {
+# pdf("epiestim.pdf")
+# for (day in 3:30) {
+#   i_ppc <- free_sim(R_posterior_dt, burn_in=day)
+#   g1 <- ggplot() + 
+#     geom_line(data = i_ppc, aes(x=day, y=sample1)) +
+#     geom_point(data = df_long, aes(x=day, y=cases_scaled), size=2, shape = "x", color="red") + 
+#     labs(title=paste("burn in days", day)) + 
+#     xlab("day") + ylab("cases")
 #   
-#   # read in rt, i, and prop_S synthetic data
-#   synthetic_dt <- fread(file)
-#   synthetic_dt$day <- 1:nrow(synthetic_dt)
-#   gamma <- 1/4
-#   n_samples <- 300L
-#   
-#   # run epiestim for varying time-windows
-#   res_plot_list <- list()
-#   plot_list <- list()
-#   dt_list <- list()
-#   for (time_window in 1:20) {
-#     print(time_window)
-#     T <- nrow(synthetic_dt)
-#     t_start <- seq(3, T-(time_window-1))
-#     t_end <- t_start + time_window-1
-#     
-#     res <- estimate_R(
-#       synthetic_dt$i,
-#       method="parametric_si",
-#       config=make_config(list(t_start = t_start, t_end = t_end, mean_si = 1/gamma, std_si = 1/gamma)))
-#     r_dt <- res$R
-#     r_dt$true <- synthetic_dt[min(r_dt$t_start):max(r_dt$t_start)]$rt
-#     r_dt$sucs <- synthetic_dt[min(r_dt$t_start):max(r_dt$t_start)]$prop_S
-#     
-#     r_dt$epiestim_mean <- r_dt$`Mean(R)` / r_dt$sucs
-#     r_dt$epiestim_lower <- r_dt$`Quantile.0.025(R)` / r_dt$sucs
-#     r_dt$epiestim_upper <- r_dt$`Quantile.0.975(R)` / r_dt$sucs
-#     
-#     res_plot_list[[time_window]] <- plot(res)
-#     
-#     if (plot) {
-#       g1 <- ggplot(r_dt) + 
-#         geom_line(aes(x=t_start, y=epiestim_mean)) + 
-#         geom_ribbon(aes(x=t_start, ymin=epiestim_lower, ymax=epiestim_upper), alpha=0.5) +
-#         geom_line(aes(x=t_start, y=true, color="red")) + 
-#         theme_bw() + labs(title = paste0("EpiEstim ", time_window, " Day Window")) + 
-#         xlab("day") + ylab("R_t")
-#       
-#       plot_list[[time_window]] <- g1
-#     }
-#     
-#     # sample from posterior
-#     helper_sample_posterior <- function(x, R, n) {
-#       return(sample_posterior_R(R, n, x))
-#     }
-#     
-#     sample_lists <- lapply(1:nrow(r_dt), helper_sample_posterior, R=res, n=n_samples)
-#     R_posterior_dt <- transpose(as.data.table(sample_lists))
-#     samplecols <- paste0("sample",1:n_samples)
-#     names(R_posterior_dt) <- samplecols
-#     R_posterior_dt$day <- r_dt$t_start
-#     R_posterior_dt$window <- time_window
-#     # divide by susceptible to get time-varying Rt
-#     R_posterior_dt <- merge(R_posterior_dt, synthetic_dt, by=c("day"))
-#     R_posterior_dt[ , (samplecols) := lapply(.SD, '/', prop_S), .SDcols = samplecols]
-#     
-#     dt_list[[time_window]] <- R_posterior_dt
-#   }
-#   
-#   R_posterior_all_dt <- rbindlist(dt_list)
-#   # 95% CI
-#   percentile <- 95
-#   quantiles <- c((1 - percentile/100)/2, 1 - (1 - percentile/100)/2)
-#   percentile95_dt <- R_posterior_all_dt[,as.list(quantile(.SD, quantiles, na.rm=TRUE)),  .SDcols=paste0("sample", 1:300), by=.(day,window)]
-#   # 50% CI
-#   percentile <- 50
-#   quantiles <- c((1 - percentile/100)/2, 1 - (1 - percentile/100)/2)
-#   percentile50_dt <- R_posterior_all_dt[,as.list(quantile(.SD, quantiles, na.rm=TRUE)),  .SDcols=paste0("sample", 1:300), by=.(day,window)]
-#   # mean
-#   mean_dt <- R_posterior_all_dt[, .(mean = rowMeans(.SD, na.rm=TRUE)), .SDcols=paste0("sample", 1:300), by=.(day,window)]
-#   # median
-#   med_dt <- R_posterior_all_dt[, .(med = rowMedians(as.matrix(.SD), na.rm=TRUE)), .SDcols=paste0("sample", 1:300), by=.(day,window)]
-#   
-#   merge_dt <- merge(percentile95_dt, percentile50_dt, by=c("window","day"))
-#   merge_dt <- merge(merge_dt, mean_dt, by=c("window","day"))
-#   merge_dt <- merge(merge_dt, med_dt, by=c("window","day"))
-#   merge_dt$param <- param_num
-# 
+#   print(g1)
 # }
+# dev.off()
+
+i_ppc <- free_sim(R_posterior_dt, burn_in=11)
+
+# save posterior
+fwrite(i_ppc, "/Users/hwunrow/Documents/GitHub/epyfilter/src/epyfilter/plot/nyc_real_data_epiestim_ippc.csv")
+
