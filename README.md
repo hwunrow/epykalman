@@ -14,7 +14,7 @@ conda env create -f environment.yml
 Then, install the epykalman package:
 
 ```
-python setup.py install
+pip install -e .
 ```
 
 ## Directory Tree Structure
