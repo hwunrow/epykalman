@@ -1,0 +1,3 @@
+[submodule "src/epyfilter/EpiFilter/EpiFilter"]
+	path = src/epyfilter/EpiFilter/EpiFilter
+	url = git@github.com:kpzoo/EpiFilter.git
