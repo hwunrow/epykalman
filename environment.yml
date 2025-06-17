@@ -1,4 +1,4 @@
-name: epyfilter
+name: epykalman
 channels:
   - defaults
 dependencies:
@@ -174,4 +174,3 @@ dependencies:
       - seaborn==0.13.2
       - smmap==5.0.1
       - widgetsnbextension==4.0.10
-prefix: /ifs/scratch/jls106_gp/nhw2114/anaconda3/envs/epyfilter
