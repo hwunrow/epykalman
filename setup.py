@@ -1,12 +1,12 @@
 from setuptools import setup, find_packages
 
 # Define your project's metadata
-name = "epyfilter"
+name = "epykalman"
 version = "1.0.0"
 description = "Estimate Time-varying Reproduction Number using Ensemble Adjustment Kalman Filter using adaptive inflation"
 author = "Han Yong Wunrow"
 author_email = "nhw2114@columbia.edu"
-url = "https://github.com/hwunrow/epyfilter"
+url = "https://github.com/hwunrow/epykalman"
 license = "MIT"
 
 # Define your project's dependencies
@@ -42,7 +42,7 @@ setup(
     install_requires=install_requires,
     tests_require=test_requirements,
     extras_require={
-            "interactive": interactive_requirements,
+        "interactive": interactive_requirements,
     },
     use_2to3=False,
     zip_safe=True,
