@@ -283,7 +283,7 @@ rt_rmse <- function(dt, dd=NULL, evaluate_on=FALSE, colname=NULL) {
   }
 }
 
-compute_crps <- function(dt, dd, colname, ww=20) {
+compute_crps <- function(dt, dd, colname, ww=20, evaluate_on=FALSE) {
   # Calculate the Continuous Ranked Probability Score (CRPS).
   # Evaluates on day.
   
@@ -300,45 +300,71 @@ compute_crps <- function(dt, dd, colname, ww=20) {
   # Handle day out of bounds
   dd <- min(dd, max(dt_copy[window==ww, day]))
   m <- sum(grepl("^sample", colnames(dt_copy)))
-  
-  # get observation and ensemble
-  samplecols <- paste0("sample", 1:m)
-  ensembles <- dt_copy[day==dd, samplecols, with=FALSE]
-  ensembles <- as.numeric(ensembles)
-  ensembles <- sort(ensembles)
-  obs <- dt_copy[day==dd & window==ww, i]
-  
-  # Handle different cases based on 'obs' position relative to 'ensembles'
-  if (obs < ensembles[1]) {
-    cdf_obs <- rep(1, m)
-    cdf <- seq(0, (m - 1) / m, length.out = m)
-    all_mem <- c(obs, ensembles) 
-    delta_fc <- diff(all_mem)
-  } else if (obs > ensembles[m]) {
-    cdf_obs <- rep(0, m)
-    cdf <- seq(1 / m, 1, length.out = m)
-    all_mem <- c(ensembles, obs) 
-    delta_fc <- diff(all_mem)
-  } else if (obs %in% ensembles) {
-    cdf_obs <- as.numeric(ensembles >= obs)
-    cdf <- seq(1 / m, 1, length.out = m)
-    all_mem <- ensembles
-    delta_fc <- c(diff(all_mem), 0)
-  } else {
-    cdf_obs <- as.numeric(ensembles >= obs) 
-    cdf <- seq(1 / m, (m - 1) / m, length.out = m - 1)
-    idx <- which(cdf_obs == 1)[1]
-    cdf <- c(cdf[1:(idx - 1)], cdf[idx - 1], cdf[idx:length(cdf)]) 
-    all_mem <- sort(c(ensembles, obs))
-    delta_fc <- diff(all_mem)
+
+  compute_crps_window <- function(www, ddd) {
+    # get observation and ensemble
+    samplecols <- paste0("sample", 1:m)
+    ensembles <- dt_copy[day==ddd & window==www, samplecols, with=FALSE]
+    ensembles <- as.numeric(ensembles)
+    ensembles <- sort(ensembles)
+    obs <- dt_copy[day==ddd & window==www, i]
+    
+    if (length(ensembles) == 0) {
+      # ensembles all NaN
+      return(NULL)
+    }
+    
+    # Handle different cases based on 'obs' position relative to 'ensembles'
+    if (obs < ensembles[1]) {
+      cdf_obs <- rep(1, m)
+      cdf <- seq(0, (m - 1) / m, length.out = m)
+      all_mem <- c(obs, ensembles) 
+      delta_fc <- diff(all_mem)
+    } else if (obs > ensembles[m]) {
+      cdf_obs <- rep(0, m)
+      cdf <- seq(1 / m, 1, length.out = m)
+      all_mem <- c(ensembles, obs) 
+      delta_fc <- diff(all_mem)
+    } else if (obs %in% ensembles) {
+      cdf_obs <- as.numeric(ensembles >= obs)
+      cdf <- seq(1 / m, 1, length.out = m)
+      all_mem <- ensembles
+      delta_fc <- c(diff(all_mem), 0)
+    } else {
+      cdf_obs <- as.numeric(ensembles >= obs) 
+      cdf <- seq(1 / m, (m - 1) / m, length.out = m - 1)
+      idx <- which(cdf_obs == 1)[1]
+      cdf <- c(cdf[1:(idx - 1)], cdf[idx - 1], cdf[idx:length(cdf)]) 
+      all_mem <- sort(c(ensembles, obs))
+      delta_fc <- diff(all_mem)
+    }
+    
+    # Calculate and return CRPS
+    crps_score <- sum((cdf - cdf_obs)^2 * delta_fc)
+    crps_dt <- data.table(window=www, crps=crps_score)
+    
+    return(crps_dt)
+    
   }
   
-  # Calculate and return CRPS
-  crps_score <- sum((cdf - cdf_obs)^2 * delta_fc)
-  
-  crps_dt <- data.table(window=unique(dt_copy$window), crps=crps_score)
-  setnames(crps_dt, "crps", colname)
+  if (evaluate_on) {
+    crps_dt <- rbindlist(lapply(unique(dt_copy$window), compute_crps_window, ddd=dd))
+    setnames(crps_dt, "crps", colname)
+  } else {
+    crps_list <- list()
+    i <- 1
+    for (www in unique(dt_copy$window)) {
+      for (ddd in min(dt_copy$day):dd) {
+        crps_list[[i]] <- compute_crps_window(www, ddd)
+        i <- i + 1
+      }
+    }
+    crps_dt <- rbindlist(crps_list)
+    crps_dt <- crps_dt[, .(crps=mean(crps, na.rm=TRUE)), by=c("window")]
+    setnames(crps_dt, "crps", colname)
+  }
   
   return(crps_dt)
+  
 }
 
