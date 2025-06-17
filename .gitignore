@@ -67,7 +67,7 @@ share/python-wheels/
 MANIFEST
 
 *.mat
-src/epyfilter/plot/*.png
-src/epyfilter/plot/*.pdf
-src/epyfilter/plot/*.eps
-src/epyfilter/plot/*.csv
+src/epykalman/plot/*.png
+src/epykalman/plot/*.pdf
+src/epykalman/plot/*.eps
+src/epykalman/plot/*.csv
