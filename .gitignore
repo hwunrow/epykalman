@@ -71,3 +71,5 @@ src/epykalman/plot/*.png
 src/epykalman/plot/*.pdf
 src/epykalman/plot/*.eps
 src/epykalman/plot/*.csv
+src/epykalman/plot/*.pkl
+src/epykalman/*.pkl
