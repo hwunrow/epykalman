@@ -3,7 +3,7 @@
 #' @Description: Run EpiEstim to compute rmse, crps, and reliabiltiy time series on C2B2
 ################################################################################
 rm(list=ls())
-.libPaths("/ifs/home/jls106_gp/nhw2114/R/x86_64-pc-linux-gnu-library/4.3/")
+.libPaths("/burg/home/nhw2114/R/x86_64-pc-linux-gnu-library/4.3/")
 library(argparse)
 library(data.table)
 library(ggplot2)
@@ -11,14 +11,15 @@ library(EpiEstim)
 library(matrixStats)
 library(verification)
 library(parallel)
-source("/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/qsub.R")
-source("/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/posterior_checks.R")
+# source("/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/qsub.R")
+source("/burg/apam/users/nhw2114/repos/epyfilter/src/epyfilter/utils/posterior_checks.R")
+
 
 # Get arguments from parser
 parser <- ArgumentParser()
-parser$add_argument("--in-dir", help = "directory for external inputs", default = "/ifs/scratch/jls106_gp/nhw2114/repos/rt-estimation/src/epyfilter/c2b2/", type = "character")
-parser$add_argument("--data-dir", help = "directory for synthetic inputs", default = "/ifs/scratch/jls106_gp/nhw2114/data/20231106_synthetic_data/", type = "character")
-parser$add_argument("--out-dir", help = "directory for this steps checks", default = "/ifs/scratch/jls106_gp/nhw2114/data/20240813_epiestim_rmse_crps_reliability_day_rerun/", type = "character")
+parser$add_argument("--in-dir", help = "directory for external inputs", default = "/burg/apam/users/nhw2114/repos/epyfilter/src/epyfilter/params/", type = "character")
+parser$add_argument("--data-dir", help = "directory for synthetic inputs", default = "/burg/apam/users/nhw2114/epyfilter/20231106_synthetic_data/", type = "character")
+parser$add_argument("--out-dir", help = "directory for this steps checks", default = "/burg/apam/users/nhw2114/epyfilter/20250515_all_windows_epiestim/", type = "character")
 parser$add_argument("--files-per-task", help = "number of files per array job", default = 10, type = "integer")
 parser$add_argument("--param-list", nargs='+', help = "rerun for specific params", type = "integer")
 parser$add_argument("--param-file", help = "file with list of parameters to run for array job", default = "good_param_list.csv", type = "character")
@@ -130,10 +131,10 @@ for (file in files) {
   # crps
   i_ppc <- merge(i_ppc, synthetic_dt[, .(day, i)], by="day", how="left")
   crps_dt <- rbindlist(lapply(unique(i_ppc$day), function(d) {
-    compute_crps(i_ppc, d, colname="crps", ww=8L)
+    compute_crps(i_ppc, d, colname="crps", ww=8L, evaluate_on=TRUE)
   }))
   crps_dt <- crps_dt[crps_dt$window == 8]
-  crps_dt$day <- unique(i_ppc$day)
+  crps_dt$day <- sort(unique(i_ppc$day))
   
   post_checks_dt <- merge(rmse_dt, in_ci_dt, by=c("window", "day"))
   post_checks_dt <- merge(post_checks_dt, crps_dt, by=c("window", "day"))
