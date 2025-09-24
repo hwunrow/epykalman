@@ -1,5 +1,6 @@
 # epykalman
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![DOI](https://zenodo.org/badge/531777160.svg)](https://doi.org/10.5281/zenodo.17195298)
 
 This repository contains the code and data used to generate the results and figures presented in "[Data assimilation for estimating time-varying reproduction numbers]()" by Wunrow et al. (2024).
 
